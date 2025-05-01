@@ -2195,18 +2195,53 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
       else
         fun vdep dst src -> eor vdep dst src src
 
-    let calc0_gen csel st vdep = match csel with
-      | NoCsel -> fun src dst -> [calc0 vdep src dst],st
-      | OkCsel ->
-         fun dst src ->
-           let r3,st = next_reg st in
-           let r4,st = next_reg st in
-           [do_movi vdep r3 1; do_cmpi vdep src 0;
-            do_csel vdep dst r3 r4; andi vdep dst dst 2;],st
+    let emit_pre_cas (cas_src: cas_src) (src: special2) (st: st) p vdep init =
+      let x,init,st = U.next_init st p init "cas_var" in (*TODO: how can I get a simple fresh name ?*)
+      let r1, st = next_reg st in
+      let r2, st = next_reg st in
+      let r3, st = next_reg st in
+      let ins_list = [calc0 vdep r1 src] in
+      (* At least:
+      LDR W0, SRC
+      EOR W1, W0, W0
+      then, it depends on CasSrc *)
+      match cas_src with
+      | CasSrcM -> Warn.fatal "CasSrcM not implemented (see CasSrcRn as a fallback)"
+      | CasSrcRn ->
+        (*let init,_,st = STR.emit_store st p init "cas_var" p None C.evt_null in TODO this is not what we want..*)
+        (r2, r3, x),ins_list@[do_add64 vdep x x r1;],st,init
+      | _ ->
+        match cas_src with
+        | CasSrcRs -> (r1, r2, x),ins_list,st,init
+        | CasSrcRt -> (r3, r1, x),ins_list,st,init
+        | _ -> failwith "not possible"
 
-    let emit_access_dep_addr csel vdep st p init e rd =
+
+    (* Compute 0 to a register with a dependency (EOR, AND or other) *)
+    let calc0_gen (cc: cas_or_csel) (st:st) p vdep init =
+      fun dst src -> match cc with
+      | NoDefault -> [calc0 vdep dst src],st,init
+      | OkCsel ->
+          let r3,st = next_reg st in
+          let r4,st = next_reg st in
+          [do_movi vdep r3 1; do_cmpi vdep src 0;
+          do_csel vdep dst r3 r4; andi vdep dst dst 2;],st,init
+      | OkCas (cas_cmp, cas_src, cas_dst) ->
+          (*? for ok/no, wouldn't we have to know the asserted value of W1. Is that possible ?*)
+          Warn.warn_always "Using OkCas in calc0. Can't guarantee Cas ok/no status.";
+          let (r1,r2,x),pre_ins_list,st,init = emit_pre_cas cas_src src st p vdep init in
+          match cas_dst with
+          | CasDstM ->
+            let r3,st = next_reg st in
+            (*TODO we need to change reg value in init for ok/no *)
+            pre_ins_list@[cas RMW_P r1 r2 x;do_ldr vdep r3 x;calc0 vdep dst r3;],st,init
+          | CasDstRs ->
+            let setup_ok_ins = if cas_cmp then [do_movi vdep r2 1;] else [] in
+            pre_ins_list@setup_ok_ins@[cas RMW_P r1 r2 x;calc0 vdep dst r1;],st,init
+
+    let emit_access_dep_addr cc vdep st p init e rd =
       let r2,st = next_reg st in
-      let cs0,st =  calc0_gen csel st vdep r2 rd in
+      let cs0,st,init =  calc0_gen cc st p vdep init r2 rd in
       (* collapse the value `v` in event `e` to integer *)
       let value = Code.value_to_int e.C.v in
       match e.C.dir,e.C.loc with
@@ -2442,53 +2477,53 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
       | _,Code _ -> Warn.fatal "No dependency to code location"
       (* END of emit_access_dep_addr *)
 
-    let emit_addr_dep csel vdep st p init loc rd =
+    let emit_addr_dep cc vdep st p init loc rd =
       let r2,st = next_reg st in
-      let cs0,st = calc0_gen csel st vdep r2 rd in
+      let cs0,st,init = calc0_gen cc st p vdep init r2 rd in
       let rA,init,st = U.next_init st p init loc in
       let rA,csum,st = do_sum_addr vdep st rA r2 in
       rA,init,pseudo (cs0@csum),st
 
-    let emit_exch_dep_addr1 csel vdep st p init er ew rd =
+    let emit_exch_dep_addr1 cc vdep st p init er ew rd =
       do_emit_exch1
         (fun st p init er ->
-          emit_addr_dep csel vdep st p init (get_tagged_loc er) rd)
+          emit_addr_dep cc vdep st p init (get_tagged_loc er) rd)
         st p init er ew
 
-    let emit_exch_dep_addr22 csel vdep st p init er ew rd =
+    let emit_exch_dep_addr22 cc vdep st p init er ew rd =
       do_emit_exch22
         (fun st p init er ->
-          emit_addr_dep csel vdep st p init (get_tagged_loc er) rd)
+          emit_addr_dep cc vdep st p init (get_tagged_loc er) rd)
         st p init er ew
 
-    let emit_exch_dep_addr21 csel vdep st p init er ew rd =
+    let emit_exch_dep_addr21 cc vdep st p init er ew rd =
       do_emit_exch21
         (fun st p init er ->
-          emit_addr_dep csel vdep st p init (get_tagged_loc er) rd)
+          emit_addr_dep cc vdep st p init (get_tagged_loc er) rd)
         st p init er ew
 
-    let emit_exch_dep_addr12 csel vdep st p init er ew rd =
+    let emit_exch_dep_addr12 cc vdep st p init er ew rd =
       do_emit_exch12
         (fun st p init er ->
-          emit_addr_dep csel vdep st p init (get_tagged_loc er) rd)
+          emit_addr_dep cc vdep st p init (get_tagged_loc er) rd)
         st p init er ew
 
-    let emit_exch_dep_addr csel vdep st p init er ew rd =
+    let emit_exch_dep_addr cc vdep st p init er ew rd =
       let ar,_ = tr_none er.C.atom
       and aw,_ = tr_none ew.C.atom in
       match ar,aw with
       | (Pair _,Pair _)->
-         emit_exch_dep_addr22 csel vdep st p init er ew rd
+         emit_exch_dep_addr22 cc vdep st p init er ew rd
       | (Pair _,_) ->
          check_cu (not A64.do_cu);
-         emit_exch_dep_addr21 csel vdep st p init er ew rd
+         emit_exch_dep_addr21 cc vdep st p init er ew rd
       | (_,Pair _) ->
          check_cu (not A64.do_cu);
-         emit_exch_dep_addr12 csel vdep st p init er ew rd
+         emit_exch_dep_addr12 cc vdep st p init er ew rd
       | _,_ ->
-         emit_exch_dep_addr1 csel vdep st p init er ew rd
+         emit_exch_dep_addr1 cc vdep st p init er ew rd
 
-    let emit_access_dep_data csel vdep st p init e  r1 =
+    let emit_access_dep_data cc vdep st p init e  r1 =
       let atom = match e.C.atom with
       | None -> None
       | Some (a,m) -> begin match a with
@@ -2510,47 +2545,47 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
             let r2,st = next_reg st in
             match atom with
             | Some (Tag,None) ->
-                let cs0,st = calc0_gen csel st vdep r2 r1 in
+                let cs0,st,init = calc0_gen cc st p vdep init r2 r1 in
                 let rA,init,st = U.next_init st p init (add_tag loc value) in
                 let rB,cB,st = sum_addr st rA r2 in
                 rB,pseudo (cs0@cB),init,st,[]
             | Some (_,Some (sz,_)) ->
-                let cs0,st = calc0_gen csel st vdep r2 r1 in
+                let cs0,st,init = calc0_gen cc st p vdep init r2 r1 in
                 let rA,init,csA,st = emit_mov_sz sz st p init value in
                 let cs2 = pseudo cs0 in
                 let addi = [add (sz2v sz) r2 r2 rA] in
                 r2,csA@cs2,init,st,addi
             | Some (CapaSeal,None) ->
-                let cs0,st = calc0_gen csel st vdep r2 r1 in
+                let cs0,st,init = calc0_gen cc st p vdep init r2 r1 in
                 let cs2 = pseudo cs0 in
                 let addi = [addi r2 r2 e.C.ord] in
                 r2,cs2,init,st,addi
             | Some (Pte _,None) ->
                 let rA,init,st = U.emit_pteval st p init e.C.pte in
-                let cs,st =
+                let cs,st,init =
                   match vdep with
                   | A64.V128 ->
                       Warn.fatal "128 bit dependency to pte access"
                   | A64.V64 ->
-                      calc0_gen csel st A64.V64 r2 r1
+                      calc0_gen cc st p A64.V64 init r2 r1
                   | A64.V32 ->
                       let r3,st = tempo1 st in
-                      let cs0,st = calc0_gen csel st A64.V64 r2 r3 in
-                      sxtw r3 r1::cs0,st in
+                      let cs0,st,init = calc0_gen cc st p A64.V64 init r2 r3 in
+                      sxtw r3 r1::cs0,st,init in
                 let addi = [add A64.V64 r2 r2 rA] in
                 let cs2 = pseudo cs in
                 r2,cs2,init,st,addi
             | _ ->
-                let cs2,st =
+                let cs2,st,init =
                   match vdep,vloc with
                   | (V128,_)|(_,V128) ->
                       Warn.fatal "dependance from 128 bits access"
                   | (V32,V32)|(V64,V64)|(V64,V32) ->
-                     calc0_gen csel st vdep r2 r1
+                     calc0_gen cc st p vdep init r2 r1
                   | (V32,V64) ->
                       let r3,st = tempo1 st in
-                      let cs,st = calc0_gen csel st vdep r3 r1 in
-                      sxtw r2 r3::cs,st in
+                      let cs,st,init = calc0_gen cc st p vdep init r3 r1 in
+                      sxtw r2 r3::cs,st,init in
                 let addi = [addi r2 r2 value] in
                 let cs2 = pseudo cs2 in
                 r2,cs2,init,st,addi in
@@ -2665,8 +2700,8 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
       let lab = Label.next_label "LC" in
       let c = [Instruction (do_cbnz vdep r lab); Label (lab,Nop);] in c
 
-    let emit_ctrl_gen csel st vdep r = match csel with
-      | NoCsel -> emit_ctrl vdep r,st
+    let emit_ctrl_gen (cc:cas_or_csel) st vdep r = match cc with
+      | NoDefault -> emit_ctrl vdep r,st
       | OkCsel ->
          let r2,st = next_reg st in
          let r3,st = next_reg st in
@@ -2674,14 +2709,15 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
            [do_cmpi vdep r 0; do_cinc vdep r2 r3 r2;]@
            emit_ctrl vdep r2,
          st
+      | OkCas _ -> failwith "emit_ctrl_gen: OkCas not implemented"
 
-    let emit_access_ctrl csel vdep isb st p init e r1 =
-      let c,st = emit_ctrl_gen csel st vdep r1 in
+    let emit_access_ctrl cc vdep isb st p init e r1 =
+      let c,st = emit_ctrl_gen cc st vdep r1 in
       let ropt,init,cs,st = emit_access st p init e in
       ropt,init,insert_isb isb c cs,st
 
-    let emit_exch_ctrl csel vdep isb st p init er ew r1 =
-      let c,st = emit_ctrl_gen csel st vdep r1 in
+    let emit_exch_ctrl cc vdep isb st p init er ew r1 =
+      let c,st = emit_ctrl_gen cc st vdep r1 in
       let ropt,init,cs,st = emit_exch st p init er ew in
       ropt,init,insert_isb isb c cs,st
 
@@ -2698,25 +2734,25 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
       let at = e.C.atom in
       tr_atom at
 
-    let emit_access_dep st p init e (dp,csel) r1 n1 =
+    let emit_access_dep st p init e (dp,cc) r1 n1 =
       let vdep = node2vdep n1 in
       match dp with
-      | D.ADDR -> emit_access_dep_addr csel vdep st p init e r1
-      | D.DATA -> emit_access_dep_data csel vdep st p init e r1
-      | D.CTRL -> emit_access_ctrl csel vdep false st p init e r1
-      | D.CTRLISYNC -> emit_access_ctrl csel vdep true st p init e r1
+      | D.ADDR -> emit_access_dep_addr cc vdep st p init e r1
+      | D.DATA -> emit_access_dep_data cc vdep st p init e r1
+      | D.CTRL -> emit_access_ctrl cc vdep false st p init e r1
+      | D.CTRLISYNC -> emit_access_ctrl cc vdep true st p init e r1
 
-    let emit_exch_dep st p init er ew (dp,csel) vdep rd = match dp with
-    | D.ADDR -> emit_exch_dep_addr csel vdep st p init er ew rd
+    let emit_exch_dep st p init er ew (dp,cc) vdep rd = match dp with
+    | D.ADDR -> emit_exch_dep_addr cc vdep st p init er ew rd
     | D.DATA -> Warn.fatal "not data dependency to RMW"
-    | D.CTRL -> emit_exch_ctrl csel vdep false st p init er ew rd
-    | D.CTRLISYNC -> emit_exch_ctrl csel vdep true st p init er ew rd
+    | D.CTRL -> emit_exch_ctrl cc vdep false st p init er ew rd
+    | D.CTRLISYNC -> emit_exch_ctrl cc vdep true st p init er ew rd
 
-    let emit_ldop_dep ins ins_mixed  st p init er ew (dp,csel) vdep rd =
+    let emit_ldop_dep ins ins_mixed  st p init er ew (dp,cc) vdep rd =
       match dp with
     | D.ADDR ->
        let rA,init,caddr,st =
-         emit_addr_dep csel vdep st p init
+         emit_addr_dep cc vdep st p init
            (get_tagged_loc er) rd in
         let rR,init,cs,st = do_emit_ldop_rA ins ins_mixed st p init er ew rA in
         rR,init,caddr@cs,st
@@ -2726,28 +2762,28 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
         rR,init,insert_isb (is_ctrlisync dp) c cs,st
     | D.DATA -> Warn.fatal "Data dependency to LDOP"
 
-    let emit_cas_dep  st p init er ew (dp,csel) vdep rd = match dp with
+    let emit_cas_dep  st p init er ew (dp,cc) vdep rd = match dp with
     | D.ADDR ->
        let rA,init,caddr,st =
-         emit_addr_dep csel vdep st p init (get_tagged_loc er) rd in
+         emit_addr_dep cc vdep st p init (get_tagged_loc er) rd in
         let rR,init,cs,st = emit_cas_rA st p init er ew rA in
         rR,init,caddr@cs,st
     | D.CTRL|D.CTRLISYNC ->
-        let c,st = emit_ctrl_gen csel st vdep rd in
+        let c,st = emit_ctrl_gen cc st vdep rd in
         let rR,init,cs,st = emit_cas st p init er ew in
         rR,init,insert_isb (is_ctrlisync dp) c cs,st
     | D.DATA -> Warn.fatal "Data dependency to CAS"
 
-    let emit_stop_dep  op st p init er ew (dp,csel) rd n =
+    let emit_stop_dep  op st p init er ew (dp,cc) rd n =
       let vdep = node2vdep n in
       match dp with
       | D.ADDR ->
          let rA,init,caddr,st =
-           emit_addr_dep csel vdep st p init (get_tagged_loc er) rd in
+           emit_addr_dep cc vdep st p init (get_tagged_loc er) rd in
          let rR,init,cs,st = emit_stop_rA op st p init er ew rA in
          rR,init,caddr@cs,st
       | D.CTRL|D.CTRLISYNC ->
-         let c,st = emit_ctrl_gen csel st vdep rd in
+         let c,st = emit_ctrl_gen cc st vdep rd in
          let rR,init,cs,st = emit_stop op st p init er ew in
          rR,init,insert_isb (is_ctrlisync dp) c cs,st
       | D.DATA -> Warn.fatal "Data dependency to STOP"
@@ -2765,7 +2801,7 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
     | Cas -> map_some_dp emit_cas_dep
     | StOp op -> emit_stop_dep op
 
-    let emit_fence_dp st p init n f (dp,csel) r1 n1 =
+    let emit_fence_dp st p init n f (dp,cc) r1 n1 =
       let vdep = node2vdep n1 in
       match dp with
       | D.ADDR ->
@@ -2783,7 +2819,7 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
           n)
         with Not_found -> ());
         let r2,st = next_reg st in
-        let cs0,st =  calc0_gen csel st vdep r2 r1 in
+        let cs0,st,init =  calc0_gen cc st p vdep init r2 r1 in
         let rB,init,st = U.next_init st p init loc in
         let r,st = match f with
           | CMO _ -> rB,st
@@ -2797,7 +2833,7 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
       | D.DATA -> let init,cs, st = emit_fence st p init n f in
         Some r1, init, cs, st
       | D.CTRL | D.CTRLISYNC ->
-        let c,st = emit_ctrl_gen csel st vdep r1 in
+        let c,st = emit_ctrl_gen cc st vdep r1 in
         let init,cs,st = emit_fence st p init n f in
         None,init,insert_isb (is_ctrlisync dp) c cs,st
 

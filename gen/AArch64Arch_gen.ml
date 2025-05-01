@@ -746,17 +746,47 @@ let var_fence f r = f default r
 
 module D = Dep
 
-type csel = OkCsel|NoCsel
+type cas_cmp = bool
+type cas_src = CasSrcM | CasSrcRs | CasSrcRt | CasSrcRn
+type cas_dst = CasDstM | CasDstRs
+type cas_config = cas_cmp * cas_src * cas_dst
+type cas_or_csel = OkCas of cas_config | OkCsel | NoDefault
 
-type dp = D.dp * csel
+type dp = D.dp * cas_or_csel
+
+let pp_cas_ok = function
+  true -> "Ok" | false -> "No"
+
+let pp_cas_src = function
+  | CasSrcM -> "M"
+  | CasSrcRs -> "Rs"
+  | CasSrcRt -> "Rt"
+  | CasSrcRn -> "Rn"
+
+let pp_cas_dst = function
+  | CasDstM  -> "M"
+  | CasDstRs -> "Rs"
+
+let cartesian3 l1 l2 l3 =
+  List.concat_map (fun x ->
+    List.concat_map (fun y ->
+      List.map (fun z -> (x, y, z)) l3
+    ) l2
+  ) l1
 
 let fold_dpr f r =
-  D.fold_dpr
-    (fun d r -> f (d,NoCsel) (f (d,OkCsel) r))
+  let l d =
+    List.map (fun a -> (d, OkCas a))
+    (cartesian3 [true;false] [CasSrcM;CasSrcRs;CasSrcRt;CasSrcRn] [CasDstM;CasDstRs]) (*TODO: but CasSrcM CasDstM does not make sense ?*)
+  in D.fold_dpr
+    (fun d r -> f (d,NoDefault) (f (d,OkCsel) (List.fold_right f (l d) r)))
     r
 let fold_dpw f r =
-  D.fold_dpw
-    (fun d r -> f (d,NoCsel) (f (d,OkCsel) r))
+  let l d =
+    List.map (fun a -> (d, OkCas a))
+    (cartesian3 [true;false] [CasSrcM;CasSrcRs;CasSrcRt;CasSrcRn] [CasDstM;CasDstRs])
+  in D.fold_dpw
+    (fun d r -> f (d,NoDefault) (f (d,OkCsel) (List.fold_right f (l d) r)))
     r
 
 let pp_ddp =
@@ -768,10 +798,12 @@ let pp_ddp =
   | CTRLISYNC -> "CtrlIsb"
 
 let pp_dp (d,c) = match c with
-  | NoCsel ->  pp_ddp d
+  | NoDefault  ->  pp_ddp d
+  (* TODO: see if this syntax is ok *)
+  | OkCas (ok, src, dst) -> pp_ddp d^"Cas("^(pp_cas_ok ok)^(pp_cas_src src)^(pp_cas_dst dst)^")"
   | OkCsel -> pp_ddp d^"Csel"
 
-let lift_dd = Misc.app_opt (fun d -> d,NoCsel)
+let lift_dd = Misc.app_opt (fun d -> d,NoDefault)
 let ddr_default = lift_dd D.ddr_default
 let ddw_default = lift_dd D.ddw_default
 let ctrlr_default = lift_dd  D.ctrlr_default
@@ -782,12 +814,12 @@ let is_ctrlr dc = lift_pred D.is_ctrlr dc
 let is_addr dc = lift_pred D.is_addr dc
 
 let fst_dp (d,c) = match c with
-  | NoCsel -> List.map (fun d -> (d,NoCsel)) (D.fst_dp d)
-  | OkCsel -> []
+  | NoDefault -> List.map (fun d -> (d,NoDefault)) (D.fst_dp d)
+  | _ -> []
 
 let sequence_dp (d1,c1) (d2,c2) = match c1 with
-  | NoCsel -> List.map (fun d -> d,c2) (D.sequence_dp d1 d2)
-  | OkCsel -> []
+  | NoDefault -> List.map (fun d -> d,c2) (D.sequence_dp d1 d2)
+  | _  -> []
 
 (* Read-Modify-Write *)
 type rmw =  LrSc | LdOp of atomic_op | StOp of atomic_op | Swp | Cas
