@@ -892,6 +892,10 @@ module Make  (C:Config) (AI:Arch_herd.S) (Act:Action.S with module A = AI) :
       Misc.is_none es.output &&
       Misc.is_none es.ctrl_output
 
+    (* Utility functions to drop events based on a variant *)
+    let empty_evtrel_if_variant v ev = if C.variant v then EventRel.empty else ev
+    let empty_list_if_variant v l = if C.variant v then [] else l
+
 (****************************)
 (* Projection of event set *)
 (****************************)
@@ -2343,7 +2347,7 @@ module Make  (C:Config) (AI:Arch_herd.S) (Act:Action.S with module A = AI) :
           rn.speculated;
         po = po_unions [rn; rs; rt; wrs; rm; br; wm];
         partial_po = partial_po_unions [rn; rs; rt; wrs; rm; br; wm];
-        intra_causality_data =
+        intra_causality_data = empty_evtrel_if_variant (Variant.T 91) begin
         EventRel.union
           (EventRel.unions
              [rn.intra_causality_data;
@@ -2355,34 +2359,38 @@ module Make  (C:Config) (AI:Arch_herd.S) (Act:Action.S with module A = AI) :
                 wm.intra_causality_data])
           (let output_rn = get_output rn in
            (* Data for the Register Write Effect of Ws *)
-           let wrs_data =  match mode with
+           let wrs_data =  empty_list_if_variant (Variant.T 92) begin
+            match mode with
              | `DataFromRRs ->
                [EventRel.cartesian (get_output rs) input_wrs; ]
              | `DataFromRx | `No ->
-               [EventRel.cartesian (get_output rm) input_wrs; ] in
+               [EventRel.cartesian (get_output rm) input_wrs; ] end in
            (* Address for the Write Memory Effect *)
-           let wm_addr = [EventRel.cartesian output_rn input_wm; ]
+           let wm_addr = empty_list_if_variant (Variant.T 93)
+              [EventRel.cartesian output_rn input_wm; ]
            (* Data for the Write Memory Effect *)
-           and wm_data = match mode with
+           and wm_data = empty_list_if_variant (Variant.T 94) begin
+            match mode with
              | `DataFromRRs | `DataFromRx ->
                [EventRel.cartesian (get_output rt) input_wm; ]
              | `No ->
-               [EventRel.cartesian (get_output rm) input_wm; ] in
+               [EventRel.cartesian (get_output rm) input_wm; ] end in
            (* Handle the case where wm is NoAction *)
-           let wm_rels = match EventSet.elements wm.events with
+           let wm_rels = empty_list_if_variant (Variant.T 95) begin
+            match EventSet.elements wm.events with
              | [evt] when Act.is_no_action evt.action ->
                []
              | evts when List.for_all is_mem_store evts  ->
                wm_data @ wm_addr
-             | _ -> assert false in
+             | _ -> assert false end in
            let rels =
-             wrs_data @ wm_rels @
-             [(EventRel.cartesian output_rn input_rm);
-              (EventRel.cartesian (get_output rs) input_br);
-              (EventRel.cartesian (get_output rm) input_br);] in
+             (wrs_data @ wm_rels) @
+             [empty_evtrel_if_variant (Variant.T 96) (EventRel.cartesian output_rn input_rm);
+              empty_evtrel_if_variant (Variant.T 97) (EventRel.cartesian (get_output rs) input_br);
+              empty_evtrel_if_variant (Variant.T 98)(EventRel.cartesian (get_output rm) input_br);] in
            EventRel.unions rels
-          );
-        intra_causality_control =
+          ) end;
+        intra_causality_control = empty_evtrel_if_variant (Variant.T 90) begin
         EventRel.union
           (EventRel.unions
              [rn.intra_causality_control;
@@ -2402,14 +2410,14 @@ module Make  (C:Config) (AI:Arch_herd.S) (Act:Action.S with module A = AI) :
               | `DataFromRRs -> EventRel.cartesian output_br input_wrs
               | `DataFromRx
               | `No -> EventRel.empty)
-             (EventRel.cartesian output_br input_wm)   (* Cs1 *)
-             (EventRel.cartesian output_br input_wm)); (* Cs2 *)
-        intra_causality_order =
+             (EventRel.cartesian output_br input_wm)       (* Cs1 *)
+             (EventRel.cartesian output_br input_wm)) end; (* Cs2 *)
+        intra_causality_order = empty_evtrel_if_variant (Variant.T 89) begin
           EventRel.unions
              [rn.intra_causality_order; rs.intra_causality_order;
               rt.intra_causality_order; wrs.intra_causality_order;
               rm.intra_causality_order; br.intra_causality_order;
-              wm.intra_causality_order];
+              wm.intra_causality_order] end;
         control =
         (EventRel.unions
            [rn.control; rs.control; rt.control;

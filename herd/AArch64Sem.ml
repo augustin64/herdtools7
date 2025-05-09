@@ -2081,6 +2081,10 @@ module Make
           M.aarch64_cas_ok (Access.is_physical ac) ma read_rs read_rt write_rs
                                 read_mem write_mem branch M.eqT
         in
+        (* Drop everything with variant T99 *)
+        let mop_fail_with_wb = if C.variant (Variant.T 99) then fun _ _ -> M.ignore else mop_fail_with_wb in
+        let mop_fail_no_wb = if C.variant (Variant.T 99) then fun _ _ -> M.ignore else mop_fail_no_wb in
+        let mop_success = if C.variant (Variant.T 99) then fun _ _ -> M.ignore else mop_success in
         M.altT (
           (* CAS succeeds and generates an Explicit Write Effect *)
           (* there must be an update to the dirty bit of the TTD *)
