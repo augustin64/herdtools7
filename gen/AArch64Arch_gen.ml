@@ -204,7 +204,7 @@ type pair_idx = Both
 type atom_acc =
   | Plain of capa_opt | Acq of capa_opt | AcqPc of capa_opt | Rel of capa_opt
   | Atomic of atom_rw | Tag | CapaTag | CapaSeal | Pte of atom_pte | Neon of neon_opt
-  | Pair of pair_opt * pair_idx | Instr
+  | Pair of pair_opt * pair_idx | Instr | ACas
 
 let  plain = Plain None
 
@@ -222,7 +222,7 @@ let applies_atom (a,_) d = match a,d with
 | Pte (Read|ReadAcq|ReadAcqPc),R
 | Pte (Set _|SetRel _),W
 | Instr, R
-| (Plain _|Atomic _|Tag|CapaTag|CapaSeal|Neon _|Pair _),(R|W)
+| (Plain _|Atomic _|Tag|CapaTag|CapaSeal|Neon _|Pair _|ACas),(R|W)
   -> true
 | _ -> false
 
@@ -275,6 +275,7 @@ let is_ifetch a = match a with
      | Pair (opt,idx)
        -> sprintf "Pa%s%s" (pp_pair_opt opt) (pp_pair_idx idx)
      | Instr -> "I"
+     | ACas -> "Cas"
 
    let pp_atom (a,m) = match a with
    | Plain o ->
@@ -391,6 +392,7 @@ let is_ifetch a = match a with
    let fold_acc mixed f r =
      let r = if mixed then r else fold_pte (fun p r -> f (Pte p) r) r in
      let r = fold_morello f r in
+     let r = f ACas r in
      let r = fold_tag f r in
      let r = fold_neon f r in
      let r = fold_sve f r in
@@ -424,7 +426,7 @@ let is_ifetch a = match a with
      | Acq _|AcqPc _|Rel _|Plain _|Tag|Instr
      | CapaTag|CapaSeal
      | Pte _|Neon _
-     | Pair _
+     | Pair _ | ACas
        -> false
 
 
@@ -514,8 +516,8 @@ let is_ifetch a = match a with
    | Pair (_,Both),_ -> Code.Pair
    | Instr,_ -> Code.Instr
    | (Tag|CapaTag|CapaSeal|Pte _|Neon _),Some _ -> assert false
-   | (Plain _|Acq _|AcqPc _|Rel _|Atomic _),_
-     -> Code.Ord
+   | (Plain _|Acq _|AcqPc _|Rel _|Atomic _|ACas),_
+     -> Code.Ord (* TODO Allows R/W, but is Code.Ord what we mean ? *)
 
 
 (**************)
@@ -538,9 +540,9 @@ let overwrite_value v ao w = match ao with
 | None
 | Some
     ((Atomic _|Acq _|AcqPc _|Rel _|Plain _|
-    Tag|CapaTag|CapaSeal|Pte _|Neon _|Pair _|Instr),None)
+    Tag|CapaTag|CapaSeal|Pte _|Neon _|Pair _|Instr|ACas),None)
   -> w (* total overwrite *)
-| Some ((Atomic _|Acq _|AcqPc _|Rel _|Plain _|Neon _|Instr),Some (sz,o)) ->
+| Some ((Atomic _|Acq _|AcqPc _|Rel _|Plain _|Neon _|Instr|ACas),Some (sz,o)) ->
    ValsMixed.overwrite_value v sz o w
 | Some ((Tag|CapaTag|CapaSeal|Pte _|Pair _),Some _) ->
     assert false
@@ -549,10 +551,10 @@ let overwrite_value v ao w = match ao with
   | None
   | Some
       ((Atomic _|Acq _|AcqPc _|Rel _|Plain _
-        |Tag|CapaTag|CapaSeal|Pte _|Neon _|Pair _|Instr),None) -> v
+        |Tag|CapaTag|CapaSeal|Pte _|Neon _|Pair _|Instr|ACas),None) -> v
   | Some ((Atomic _|Acq _|AcqPc _|Rel _|Plain _|Tag|CapaTag|CapaSeal|Neon _),Some (sz,o)) ->
      ValsMixed.extract_value v sz o
-  | Some ((Pte _|Pair _|Instr),Some _) -> assert false
+  | Some ((Pte _|Pair _|Instr|ACas),Some _) -> assert false
 
 (* Page table entries *)
   module PteVal = struct
@@ -777,7 +779,7 @@ let cartesian3 l1 l2 l3 =
 let fold_dpr f r =
   let l d =
     List.map (fun a -> (d, OkCas a))
-    (cartesian3 [true;false] [CasSrcM;CasSrcRs;CasSrcRt;CasSrcRn] [CasDstM;CasDstRs]) (*TODO: but CasSrcM CasDstM does not make sense ?*)
+    (cartesian3 [true;false] [CasSrcM;CasSrcRs;CasSrcRt;CasSrcRn] [CasDstM;CasDstRs])
   in D.fold_dpr
     (fun d r -> f (d,NoDefault) (f (d,OkCsel) (List.fold_right f (l d) r)))
     r

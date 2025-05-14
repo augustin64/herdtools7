@@ -1766,6 +1766,10 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
         | R,Some (Acq _,None) ->
             let r,init,cs,st = LDAR.emit_load st p init loc  in
             Some r,init,cs,st
+        | R, Some (ACas, None) ->
+            let x,init,st = U.next_init st p init loc in
+            let dst,st = next_reg st in
+            Some dst,init,pseudo [cas RMW_P dst ZR x;],st
         | R,Some (Acq a,Some (sz,o)) ->
             let module L =
               LOAD
@@ -1845,6 +1849,13 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
             let init,cs,st =
               STLR.emit_store st p init loc value None C.evt_null in
             None,init,cs,st
+        | W, Some (ACas, None) ->
+            let xs,st = next_reg st in (* Register to compare x against *)
+            let src,st = next_reg st in
+            let xn,init,st = U.next_init st p init loc in
+            (* TODO : in most cases when a new value is written to xn, (that is not the case with do_kvm)
+                it is always old_value+1, thus we want xs = new_value-1 *)
+            None,init,pseudo [mov src value; mov xs (value-1); cas RMW_P xs src xn;],st
         | W,Some (Acq _,_) -> Warn.fatal "No store acquire"
         | W,Some (AcqPc _,_) -> Warn.fatal "No store acquirePc"
         | W,Some (Atomic rw,None) ->
@@ -1899,6 +1910,7 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
             Warn.fatal
               "Atom %s does not apply to direction %s"
               (A.pp_atom a) (Code.pp_dir d)
+        | _,Some (ACas, Some _) -> assert false
         | _,Some (Plain _,None) -> assert false
         | _,Some (Tag,_) -> assert false
         | J,_ -> emit_joker st init
@@ -2197,10 +2209,10 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
 
     let emit_pre_cas (cas_src: cas_src) (src: special2) (st: st) p vdep init =
       let x,init,st = U.next_init st p init "cas_var" in (*TODO: how can I get a simple fresh name ?*)
+      let depend_reg, st = next_reg st in (* register carrying the dependancy *)
       let r1, st = next_reg st in
       let r2, st = next_reg st in
-      let r3, st = next_reg st in
-      let ins_list = [calc0 vdep r1 src] in
+      let ins_list = [calc0 vdep depend_reg src] in
       (* At least:
       LDR W0, SRC
       EOR W1, W0, W0
@@ -2208,12 +2220,12 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
       match cas_src with
       | CasSrcM -> Warn.fatal "CasSrcM not implemented (see CasSrcRn as a fallback)"
       | CasSrcRn ->
-        (*let init,_,st = STR.emit_store st p init "cas_var" p None C.evt_null in TODO this is not what we want..*)
-        (r2, r3, x),ins_list@[do_add64 vdep x x r1;],st,init
+        (* Here, we add ADD x x 0 (with dep to src register) *)
+        (r1, r2, x),ins_list@[do_add64 vdep x x depend_reg;],st,init
       | _ ->
         match cas_src with
-        | CasSrcRs -> (r1, r2, x),ins_list,st,init
-        | CasSrcRt -> (r3, r1, x),ins_list,st,init
+        | CasSrcRs -> (depend_reg, r1, x),ins_list,st,init
+        | CasSrcRt -> (r1, depend_reg, x),ins_list,st,init
         | _ -> failwith "not possible"
 
 
@@ -2227,16 +2239,14 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
           [do_movi vdep r3 1; do_cmpi vdep src 0;
           do_csel vdep dst r3 r4; andi vdep dst dst 2;],st,init
       | OkCas (cas_cmp, cas_src, cas_dst) ->
-          (*? for ok/no, wouldn't we have to know the asserted value of W1. Is that possible ?*)
-          Warn.warn_always "Using OkCas in calc0. Can't guarantee Cas ok/no status.";
+          (* r1 returned by emit_pre_cas is always 0, x too. For cas:No, we need to set r1 to 1. *)
           let (r1,r2,x),pre_ins_list,st,init = emit_pre_cas cas_src src st p vdep init in
+          let setup_ok_ins = if not cas_cmp then [do_movi vdep r1 1;] else [] in
           match cas_dst with
           | CasDstM ->
             let r3,st = next_reg st in
-            (*TODO we need to change reg value in init for ok/no *)
-            pre_ins_list@[cas RMW_P r1 r2 x;do_ldr vdep r3 x;calc0 vdep dst r3;],st,init
+            pre_ins_list@setup_ok_ins@[cas RMW_P r1 r2 x;do_ldr vdep r3 x;calc0 vdep dst r3;],st,init
           | CasDstRs ->
-            let setup_ok_ins = if cas_cmp then [do_movi vdep r2 1;] else [] in
             pre_ins_list@setup_ok_ins@[cas RMW_P r1 r2 x;calc0 vdep dst r1;],st,init
 
     let emit_access_dep_addr cc vdep st p init e rd =
@@ -2473,6 +2483,7 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
           | W,Some (Neon _,Some _) -> assert false
           | J,_ -> emit_joker st init
           | _,Some (Plain _,None) -> assert false
+          | _, Some(ACas, _) -> Warn.fatal "emit_access_dep_addr: Cas not implemented"
           end
       | _,Code _ -> Warn.fatal "No dependency to code location"
       (* END of emit_access_dep_addr *)
@@ -2683,6 +2694,7 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
              let init,cs,st = stp_emit_store_reg opt idx st p init loc r2 in
              None,init,cs2@cs,st
           | Some (Pair _,Some _) -> assert false
+          | Some (ACas, _) -> Warn.fatal "emit_access_dep_data: Cas not implemented"
           end
       | Some J,_ -> emit_joker st init
       | _,Code _ -> Warn.fatal "Not Yet (%s,dep_data)" (C.debug_evt e)
