@@ -193,7 +193,7 @@ module NativeBackend (C : Config) = struct
       positions
     |> slices_to_positions Fun.id
 
-  let read_from_bitvector slices bv =
+  let read_from_bitvector ~loc slices bv =
     let positions = slices_to_positions slices in
     let max_pos = List.fold_left int_max 0 positions in
     let () =
@@ -206,7 +206,7 @@ module NativeBackend (C : Config) = struct
       | NV_Literal (L_BitVector bv) when Bitvector.length bv > max_pos -> bv
       | NV_Literal (L_Int i) -> Bitvector.of_z (max_pos + 1) i
       | _ ->
-          let ( ~! ) = add_dummy_annotation in
+          let ( ~! ) = add_pos_from loc in
           let t = integer_range zero_expr (expr_of_int max_pos) in
           mismatch_type bv [ T_Bits (~!(E_ATC (~!(E_Var "-"), t)), []) ]
     in
@@ -344,17 +344,23 @@ module NativeBackend (C : Config) = struct
         (let two_pow_n_minus_one = minus_one (pow_2 (e_var "N")) in
          let returns = integer_range (eoi 0) two_pow_n_minus_one in
          p
-           ~parameters:[ ("N", Some (integer_range (eoi 1) (eoi 128))) ]
+           ~parameters:[ ("N", None) ]
            ~args:[ ("x", t_bits "N") ]
            ~returns "UInt" uint);
-        (let two_pow_n_minus_one = pow_2 (minus_one (e_var "N")) in
+        (let var_N = e_var "N" in
+         let two_pow_n_minus_one = pow_2 (minus_one var_N) in
          let minus_two_pow_n_minus_one = neg two_pow_n_minus_one
          and two_pow_n_minus_one_minus_one = minus_one two_pow_n_minus_one in
+         let if_0_then_0_else else_expr =
+           cond_expr (binop `EQ_OP var_N zero_expr) zero_expr else_expr
+         in
          let returns =
-           integer_range minus_two_pow_n_minus_one two_pow_n_minus_one_minus_one
+           integer_range
+             (if_0_then_0_else minus_two_pow_n_minus_one)
+             (if_0_then_0_else two_pow_n_minus_one_minus_one)
          in
          p
-           ~parameters:[ ("N", Some (integer_range (eoi 1) (eoi 128))) ]
+           ~parameters:[ ("N", None) ]
            ~args:[ ("x", t_bits "N") ]
            ~returns "SInt" sint);
         p ~args:[ ("x", integer) ] ~returns:string "DecStr" dec_str;
@@ -475,7 +481,7 @@ let instrumentation_buffer = function
   | Some false | None ->
       (module Instrumentation.SemanticsNoBuffer : Instrumentation.SEMBUFFER)
 
-let interprete ?instrumentation static_env ast =
+let interpret ?instrumentation static_env ast =
   let module B = (val instrumentation_buffer instrumentation) in
   let module CI : Interpreter.Config = struct
     let unroll = 0

@@ -165,6 +165,20 @@ test.sve::
 		$(REGRESSION_TEST_MODE)
 	@ echo "herd7 AArch64 SVE instructions tests: OK"
 
+test:: test.asl.sve
+test-local:: test.asl.sve
+test.asl.sve: asl-pseudocode
+	@ echo
+	$(HERD_REGRESSION_TEST) \
+		-j $(J) \
+		-herd-path $(HERD) \
+		-libdir-path ./herd/libdir \
+		-litmus-dir ./herd/tests/instructions/AArch64.sve \
+		-variant sve \
+		-conf  ./herd/tests/instructions/AArch64.sve/asl.cfg \
+		$(REGRESSION_TEST_MODE)
+	@ echo "herd7 AArch64 ASL SVE instructions tests: OK"
+
 test:: test.sme
 test-local:: test.sme
 test.sme::
@@ -399,7 +413,7 @@ cata-aarch64-test-asl: asl-pseudocode
 	@ echo
 	$(HERD_CATALOGUE_REGRESSION_TEST) \
 		-j $(J) \
-		-variant asl+exp \
+		-variant asl \
 		-variant strict \
 		-herd-timeout $(TIMEOUT) \
 		-herd-path $(HERD) \
@@ -416,7 +430,7 @@ cata-aarch64-cas-test-asl: asl-pseudocode
 	@ echo
 	$(HERD_CATALOGUE_REGRESSION_TEST) \
 		-j $(J) \
-		-variant asl+exp \
+		-variant asl \
 		-variant strict \
 		-herd-timeout $(TIMEOUT) \
 		-herd-path $(HERD) \
@@ -471,7 +485,7 @@ pick-test-asl:  asl-pseudocode
 	@ echo
 	$(HERD_CATALOGUE_REGRESSION_TEST) \
 		-j $(J) \
-		-variant asl+exp \
+		-variant asl \
 		-variant strict \
 		-herd-path $(HERD) \
 		-libdir-path ./herd/libdir \

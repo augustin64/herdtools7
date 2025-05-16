@@ -79,6 +79,16 @@ let add_pos_from_st pos desc =
   if pos.desc == desc then pos else { pos with desc }
 
 let add_pos_from pos desc = { pos with desc }
+
+let add_pos_range_from pos_from pos_to desc =
+  let () = assert (pos_from.version = pos_to.version) in
+  {
+    desc;
+    pos_start = pos_from.pos_start;
+    pos_end = pos_to.pos_end;
+    version = pos_from.version;
+  }
+
 let map_desc f thing = f thing |> add_pos_from thing
 let map_desc_st' thing f = f thing.desc |> add_pos_from thing
 
@@ -362,7 +372,10 @@ and slice_equal eq slice1 slice2 =
   slice1 == slice2
   ||
   match (slice1, slice2) with
-  | Slice_Length (e11, e21), Slice_Length (e12, e22) ->
+  | Slice_Single e1, Slice_Single e2 -> expr_equal eq e1 e2
+  | Slice_Length (e11, e21), Slice_Length (e12, e22)
+  | Slice_Range (e11, e21), Slice_Range (e12, e22)
+  | Slice_Star (e11, e21), Slice_Star (e12, e22) ->
       expr_equal eq e11 e12 && expr_equal eq e21 e22
   | _ -> assert false
 

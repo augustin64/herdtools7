@@ -136,6 +136,7 @@ module type ANNOTATE_CONFIG = sig
   val use_field_getter_extension : bool
   val use_conflicting_side_effects_extension : bool
   val override_mode : override_mode
+  val control_flow_analysis : bool
 end
 
 module type S = sig
@@ -340,7 +341,11 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
   module Fn = FunctionRenaming (C)
 
   module SOp = StaticOperations.Make (struct
-    let fail = assumption_failed
+    let fail msg =
+      prerr_string msg;
+      flush stderr;
+      assumption_failed ()
+
     let warn_from = warn_from
   end)
 
@@ -449,7 +454,8 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
             if n >= i2 then acc
             else
               let e =
-                E_Literal (L_Int (Z.of_int (i1 + n))) |> add_dummy_annotation
+                E_Literal (L_Int (Z.of_int (i1 + n)))
+                |> add_pos_range_from e1 e2
               in
               e :: do_rec (n + 1)
           in
@@ -1229,7 +1235,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         let+ () = check_diet_in_width ~loc slices1 width diet in
         let width' = Diet.Int.cardinal diet |> expr_of_int in
         let+ () =
-          t_bits_bitwidth width' |> add_dummy_annotation
+          t_bits_bitwidth width' |> add_pos_from ~loc
           |> check_bits_equal_width ~loc env ty
         in
         let ses = SES.union ses_ty ses_slices in
@@ -1255,10 +1261,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
   (* End *)
 
   and annotate_type ?(decl = false) ~(loc : 'a annotated) env ty : ty * SES.t =
-    let () =
-      if false then
-        Format.eprintf "Annotating@ %a@ in env:@ %a@." PP.pp_ty ty pp_env env
-    in
+    let () = if false then Format.eprintf "Annotating@ type %a@." PP.pp_ty ty in
     let here t = add_pos_from ~loc:ty t in
     best_effort (ty, SES.empty) @@ fun _ ->
     match ty.desc with
@@ -1725,7 +1728,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
     let () =
       if false then
         Format.eprintf "@[Found candidate decl:@ @[%a@]@]@." PP.pp_t
-          [ D_Func callee |> add_dummy_annotation ]
+          [ D_Func callee |> add_pos_from ~loc ]
     in
     let+ () =
       check_true (callee.subprogram_type = call_type) @@ fun () ->
@@ -2002,7 +2005,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         and t_false, e_false', ses_false = annotate_expr env e_false in
         let t =
           best_effort t_true (fun _ ->
-              match Types.lowest_common_ancestor env t_true t_false with
+              match Types.lowest_common_ancestor ~loc:e env t_true t_false with
               | None ->
                   fatal_from ~loc (Error.UnreconcilableTypes (t_true, t_false))
               | Some t -> t)
@@ -2474,9 +2477,8 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
     assert (loc.version = V0);
     let here = add_pos_from ~loc in
     match t.desc with
-    | T_Bool | T_Int UnConstrained | T_Real | T_String | T_Enum _ ->
+    | T_Bool | T_Int UnConstrained | T_Real | T_String | T_Enum _ | T_Bits _ ->
         base_value_v1 ~loc env t
-    | T_Bits _ -> base_value_v1 ~loc env t
     | T_Int (Parameterized (_, id)) -> E_Var id |> here
     | T_Int (WellConstrained ([], _) | PendingConstrained) -> assert false
     | T_Int
@@ -2824,7 +2826,9 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
 
   let annotate_local_decl_item ~loc (env : env) ty ldk ?e ldi =
     let () =
-      if false then Format.eprintf "Annotating %a.@." PP.pp_local_decl_item ldi
+      if false then
+        Format.eprintf "Annotating LDI %a with type %a.@." PP.pp_local_decl_item
+          ldi PP.pp_ty ty
     in
     match ldi with
     (* Begin LDVar *)
@@ -2872,7 +2876,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
       if false then
         match s.desc with
         | S_Seq _ -> ()
-        | _ -> Format.eprintf "@[<3>Annotating@ @[%a@]@]@." PP.pp_stmt s
+        | _ -> Format.eprintf "@[<3>Annotating@ stmt@ @[%a@]@]@." PP.pp_stmt s
     in
     let here x = add_pos_from ~loc:s x and loc = to_pos s in
     match s.desc with
@@ -3428,6 +3432,9 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
              tuples - these are used to check binary operator precedence and are
              removed during typechecking) *)
           parameters_of_expr ~env e
+      | E_Cond (e, e1, e2) ->
+          parameters_of_expr ~env e @ parameters_of_expr ~env e1
+          @ parameters_of_expr ~env e2
       | E_Tuple _ | _ ->
           Error.fatal_from (to_pos e) (Error.UnsupportedExpr (Static, e))
     in
@@ -3493,7 +3500,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         let ty, ses_ty =
           match ty_opt with
           | None | Some { desc = T_Int UnConstrained; _ } ->
-              (Types.parameterized_ty x, SES.empty)
+              (Types.parameterized_ty ~loc x, SES.empty)
           | Some ty ->
               (* valid in environment which has no parameters declared *)
               annotate_type ~loc env ty
@@ -3566,7 +3573,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         let ty, ses_ty =
           match List.assoc_opt x func_sig.args with
           | None | Some { desc = T_Int UnConstrained } ->
-              (Types.parameterized_ty x, SES.empty)
+              (Types.parameterized_ty ~loc x, SES.empty)
           | Some ty ->
               (* valid in environment which has no parameters declared *)
               annotate_type ~loc env ty
@@ -3622,9 +3629,10 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
 
   module ControlFlow : sig
     val check_stmt_returns_or_throws : identifier -> stmt_desc annotated -> prop
-    (** [check_stmt_interrupts name env body] checks that the function named
-        [name] with the statement body [body] returns a value or throws an
-        exception. *)
+    (** [check_stmt_interrupts name body] checks that the function named [name]
+        with the statement body [body] either: returns a value, throws an
+        exception, or calls [Unreachable()].
+        It executes only when [C.control_flow_analysis] is [true]. *)
   end = struct
     (** Possible Control-Flow actions of a statement. *)
     type t =
@@ -3685,13 +3693,15 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
 
     (* End *)
 
-    (** [check_stmt_interrupts name env body] checks that the function named
-        [name] with the statement body [body] returns a value or throws an
-        exception. *)
+    (** [check_stmt_interrupts name body] checks that the function named [name]
+        with the statement body [body] either: returns a value, throws an
+        exception, or calls [Unreachable()].
+        It executes only when [C.control_flow_analysis] is [true]. *)
     let check_stmt_returns_or_throws name s () =
-      match from_stmt s with
-      | AssertedNotInterrupt | Interrupt -> ()
-      | MayNotInterrupt -> fatal_from ~loc:s (Error.NonReturningFunction name)
+      if C.control_flow_analysis then
+        match from_stmt s with
+        | AssertedNotInterrupt | Interrupt -> ()
+        | MayNotInterrupt -> fatal_from ~loc:s (Error.NonReturningFunction name)
   end
 
   (* Begin Subprogram *)
@@ -4219,16 +4229,16 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         subprograms in [impls]. Also check that there is exactly one override
         candidate for each subprogram in [impdefs]. *)
     let process_overrides ~impdefs ~impls =
-      let process_one impdefs impl =
+      let process_one (impdefs, discarded) impl =
         let matching, nonmatching =
           List.partition (signatures_match impl) impdefs
         in
         match List.length matching with
         | 0 -> fatal_from ~loc:impl NoOverrideCandidate
-        | 1 -> nonmatching
+        | 1 -> (nonmatching, matching @ discarded)
         | _ -> fatal_from ~loc:impl (TooManyOverrideCandidates matching)
       in
-      List.fold_left process_one impdefs impls
+      List.fold_left process_one (impdefs, []) impls
 
     let override_subprograms override_mode ast =
       let impdefs, impls, normals =
@@ -4246,27 +4256,36 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
       in
       let normals = List.rev normals in
       let+ () = check_implementations_unique impls in
-      let overridden =
+      let overridden, discarded =
         match override_mode with
         | Permissive ->
-            let impdefs' = process_overrides ~impdefs ~impls in
-            impdefs' @ impls
+            let impdefs', discarded = process_overrides ~impdefs ~impls in
+            (impdefs' @ impls, discarded)
         | NoImplementations ->
             let+ () =
               check_true (list_is_empty impls) (fun () ->
                   warn_from ~loc:(List.hd impls) UnexpectedImplementation)
             in
-            impdefs
+            (impdefs, [])
         | AllImpdefsOverridden ->
-            let impdefs' = process_overrides ~impdefs ~impls in
+            let impdefs', discarded = process_overrides ~impdefs ~impls in
             let+ () =
               check_true (list_is_empty impdefs') (fun () ->
                   warn_from ~loc:(List.hd impdefs') MissingOverride)
             in
-            impls
+            (impls, discarded)
       in
-      List.map (fun f -> D_Func f.desc |> add_pos_from ~loc:f) overridden
-      @ normals
+      let renamed_discarded =
+        let rename_func (f : func) =
+          let new_name = fresh_var ("__impdef_" ^ f.name) in
+          { f with name = new_name }
+        in
+        List.map (fun f -> { f with desc = rename_func f.desc }) discarded
+      in
+      let make_funcs =
+        List.map (fun f -> D_Func f.desc |> add_pos_from ~loc:f)
+      in
+      make_funcs overridden @ make_funcs renamed_discarded @ normals
   end
 
   (* Begin TypeCheckAST *)
@@ -4304,6 +4323,7 @@ module TypeCheckDefault = Annotate (struct
   let use_field_getter_extension = false
   let use_conflicting_side_effects_extension = false
   let override_mode = Permissive
+  let control_flow_analysis = true
 end)
 
 let type_and_run ?instrumentation ast =
@@ -4312,4 +4332,4 @@ let type_and_run ?instrumentation ast =
     |> Builder.with_primitives Native.DeterministicBackend.primitives
     |> TypeCheckDefault.type_check_ast
   in
-  Native.interprete ?instrumentation static_env ast
+  Native.interpret ?instrumentation static_env ast

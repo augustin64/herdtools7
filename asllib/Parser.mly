@@ -67,16 +67,12 @@ open ASTUtils
 open Desugar
 
 let version = V1
-
-let t_bit =
-  T_Bits (E_Literal (L_Int Z.one) |> add_dummy_annotation ~version, [])
-
-let zero = E_Literal (L_Int Z.zero) |> add_dummy_annotation ~version
+let t_bit ~loc = T_Bits (E_Literal (L_Int Z.one) |> add_pos_from loc, [])
+let zero ~loc = E_Literal (L_Int Z.zero) |> add_pos_from loc
 
 let make_ldi_vars (xs, ty) =
   let make_one x =
-    S_Decl (LDK_Var, LDI_Var x, Some ty, None)
-    |> add_dummy_annotation ~version
+    S_Decl (LDK_Var, LDI_Var x.desc, Some ty, None) |> add_pos_from x
   in
   List.map make_one xs |> stmt_from_list |> desc
 
@@ -278,9 +274,7 @@ let expr :=
     | e=expr; NEQ; p=pattern_mask;                            { E_Pattern (e, Pattern_Not (p) |> add_pos_from p) }
     | ARBITRARY; COLON; ~=ty;                                 < E_Arbitrary        >
     | e=pared(expr);                                          { E_Tuple [ e ]        }
-
-    (* For E_Record we use an inlined clist0 to avoid a shift/reduce conflict with elided_param_call's empty case *)
-    | t=annotated(IDENTIFIER); LBRACE; RBRACE;
+    | t=annotated(IDENTIFIER); LBRACE; MINUS; RBRACE;
         { E_Record (add_pos_from t (T_Named t.desc), []) }
     | t=annotated(IDENTIFIER); fields=braced(clist1(field_assign));
         { E_Record (add_pos_from t (T_Named t.desc), fields) }
@@ -330,9 +324,7 @@ let expr_pattern :=
 
     | ARBITRARY; COLON; ~=ty;                                         < E_Arbitrary        >
     | e=pared(expr_pattern);                                          { E_Tuple [ e ]        }
-
-    (* For E_Record we use an inlined clist0 to avoid a shift/reduce conflict with elided_param_call *)
-    | t=annotated(IDENTIFIER); LBRACE; RBRACE;
+    | t=annotated(IDENTIFIER); LBRACE; MINUS; RBRACE;
         { E_Record (add_pos_from t (T_Named t.desc), []) }
     | t=annotated(IDENTIFIER); fields=braced(clist1(field_assign));
         { E_Record (add_pos_from t (T_Named t.desc), fields) }
@@ -359,7 +351,9 @@ let pattern_set :=
       BNOT; ~=braced(pattern_list); < Pattern_Not >
     )
 
-let fields := braced(tclist0(typed_identifier))
+let fields :=
+    braced(MINUS); { [] }
+  | braced(tclist1(typed_identifier))
 let fields_opt := { [] } | fields
 
 (* Slices *)
@@ -368,7 +362,7 @@ let slice :=
   | ~=expr;                       < Slice_Single  >
   | e1=expr; COLON; e2=expr;      < Slice_Range   >
   | e1=expr; PLUS_COLON; e2=expr; < Slice_Length  >
-  | COLON; e=expr;                { Slice_Length(zero, e) }
+  | loc=annotated(COLON); e=expr; { Slice_Length(zero ~loc, e) }
   | e1=expr; STAR_COLON; e2=expr; < Slice_Star    >
 
 (* Bitfields *)
@@ -386,7 +380,7 @@ let ty :=
     | REAL;                                             { T_Real       }
     | BOOLEAN;                                          { T_Bool       }
     | STRING;                                           { T_String     }
-    | BIT;                                              { t_bit        }
+    | loc=annotated(BIT);                               { t_bit ~loc   }
     | BITS; ~=pared(expr); ~=bitfields_opt;             < T_Bits       >
     | l=plist0(ty);                                     < T_Tuple      >
     | name=IDENTIFIER;                                  < T_Named      >
@@ -541,7 +535,7 @@ let stmt :=
       | ldk=local_decl_keyword_non_var; lhs=decl_item; ty=as_ty; EQ; call=annotated(elided_param_call);
         { desugar_elided_parameter ldk lhs ty call}
       | VAR; ldi=decl_item; ty=ty_opt; e=option_eq_expr;      { S_Decl (LDK_Var, ldi, ty, e) }
-      | VAR; ~=clist2(IDENTIFIER); ~=as_ty;                  < make_ldi_vars >
+      | VAR; ~=clist2(annotated(IDENTIFIER)); ~=as_ty;        < make_ldi_vars >
       | VAR; lhs=decl_item; ty=as_ty; EQ; call=annotated(elided_param_call);
         { desugar_elided_parameter LDK_Var lhs ty call}
       | PRINTLN; args=plist0(expr);                           { S_Print { args; newline = true; debug = false } }
@@ -586,7 +580,7 @@ let call :=
   | name=IDENTIFIER; params=braced(clist1(expr)); args=opt_call_args;
     { { name; params; args; call_type = ST_Function } }
 let elided_param_call :=
-  | name=IDENTIFIER; LBRACE; RBRACE; args=plist0(expr);
+  | name=IDENTIFIER; LBRACE; RBRACE; args=opt_call_args;
     { { name; params=[]; args; call_type = ST_Function } }
   | name=IDENTIFIER; LBRACE; COMMA; params=clist1(expr); RBRACE; args=opt_call_args;
     { { name; params; args; call_type = ST_Function } }
@@ -606,12 +600,12 @@ let override ==
     | IMPLEMENTATION; { Implementation })
 
 let accessors :=
-  | GETTER; getter=func_body;
-    SETTER; EQ; setter_arg=IDENTIFIER; setter=func_body;
-    { { getter; setter; setter_arg } }
-  | SETTER; EQ; setter_arg=IDENTIFIER; setter=func_body;
-    GETTER; getter=func_body;
-    { { getter; setter; setter_arg } }
+  | GETTER; getter=maybe_empty_stmt_list; end_semicolon;
+    SETTER; setter=maybe_empty_stmt_list; end_semicolon;
+    { { getter; setter } }
+  | SETTER; setter=maybe_empty_stmt_list; end_semicolon;
+    GETTER; getter=maybe_empty_stmt_list; end_semicolon;
+    { { getter; setter } }
 
 let decl :=
   | d=annotated (
@@ -674,9 +668,9 @@ let decl :=
       (* End *)
     )
   ); { [d] }
-  | ~=override; ACCESSOR; name=IDENTIFIER; ~=params_opt; ~=func_args; BIARROW; ~=ty;
+  | ~=override; ACCESSOR; name=IDENTIFIER; ~=params_opt; ~=func_args; BIARROW; setter_arg=IDENTIFIER; ~=as_ty;
     ~=accessor_body;
-    { desugar_accessor_pair override name params_opt func_args ty accessor_body }
+    { desugar_accessor_pair override name params_opt func_args setter_arg as_ty accessor_body }
 
 let accessor_body == BEGIN; ~=accessors; end_semicolon;
   { accessors }

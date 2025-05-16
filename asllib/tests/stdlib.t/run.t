@@ -10,6 +10,8 @@ Tests using ASLRef OCaml primitives for some stdlib functions
   $ aslref round.asl
   $ aslref set-bits.asl
   File set-bits.asl, line 29, characters 15 to 28:
+          assert k MOD 2^(m+1) == 2^m;
+                 ^^^^^^^^^^^^^
   Warning: Removing some values that would fail with op MOD from constraint set
   {0..(2 ^ (n + 1)), 1, (- ((- 2) ^ (n + 1)))..((- 2) ^ (n + 1))} gave
   {1, 1..(2 ^ (n + 1)), (- ((- 2) ^ (n + 1)))..((- 2) ^ (n + 1))}. Continuing
@@ -47,7 +49,7 @@ Checking that --no-primitives option actually removes OCaml primitives
   ASL Execution error: Mismatch type: value -1 does not belong to type integer.
   [1]
   $ aslref --no-primitives no-primitives-test.asl
-  File ASL Standard Library, line 59, characters 11 to 16:
+  File ASL Standard Library, line 60, characters 11 to 16:
   ASL Execution error: Assertion failed: (__stdlib_local_a > 0).
   [1]
 
@@ -63,6 +65,8 @@ Tests using ASL stdlib only
   $ aslref --no-primitives round.asl
   $ aslref --no-primitives set-bits.asl
   File set-bits.asl, line 29, characters 15 to 28:
+          assert k MOD 2^(m+1) == 2^m;
+                 ^^^^^^^^^^^^^
   Warning: Removing some values that would fail with op MOD from constraint set
   {0..(2 ^ (n + 1)), 1, (- ((- 2) ^ (n + 1)))..((- 2) ^ (n + 1))} gave
   {1, 1..(2 ^ (n + 1)), (- ((- 2) ^ (n + 1)))..((- 2) ^ (n + 1))}. Continuing
