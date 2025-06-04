@@ -13,6 +13,7 @@ abstract
 abstracting
 abstraction
 abstracts
+abuse
 accept
 acceptable
 acceptance
@@ -313,6 +314,7 @@ clash
 clashes
 clashing
 classed
+classified
 classifies
 classify
 classifying
@@ -375,6 +377,7 @@ computation
 computational
 compute
 computed
+computes
 concatenated
 concatenates
 concatenating
@@ -765,6 +768,7 @@ extract
 extracted
 extracting
 extracts
+extremes
 facilitate
 fact
 factor
@@ -982,8 +986,10 @@ induced
 induction
 inequality
 inevitably
+infer
 inference
 inferred
+inferring
 infers
 infinite
 infinity
@@ -1124,6 +1130,7 @@ limitation
 limited
 limits
 line
+lint
 linux
 list
 listed
@@ -1140,6 +1147,7 @@ long
 longer
 longest
 look
+looked
 looking
 looks
 loop
@@ -1188,6 +1196,7 @@ mechanisms
 meets
 member
 members
+membership
 memory
 menhir
 mentioned
@@ -1288,6 +1297,7 @@ occur
 occurrence
 occurrences
 occurring
+occurs
 of
 offers
 offset
@@ -1318,6 +1328,7 @@ optimized
 option
 optional
 optionally
+optionals
 options
 or
 order
@@ -1578,6 +1589,7 @@ relations
 relationship
 relative
 relatively
+relax
 release
 relevant
 reliable
@@ -1589,6 +1601,7 @@ remain
 remainder
 remaining
 remains
+remembering
 remove
 removed
 removes
@@ -1597,6 +1610,7 @@ rename
 renames
 renaming
 repeat
+repeated
 repeating
 replace
 replaced
@@ -1772,6 +1786,7 @@ size
 slice
 slices
 slicing
+slightly
 small
 smaller
 smt
@@ -1867,6 +1882,7 @@ success
 successful
 successfully
 successive
+successor
 succinctly
 such
 sufficient

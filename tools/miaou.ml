@@ -95,6 +95,7 @@ module Make
       |> StringMap.add "Instr-read-ordered-before" "Instrreadob"
       |> StringMap.add "L" "REL"
       |> StringMap.add "id" "sameEffect"
+
     let defs =
       match O.texfile with
       | None -> None
@@ -112,6 +113,78 @@ module Make
          fun name ->
          try StringMap.find (tr_id name) defs
          with Not_found -> None
+
+(*****************************************)
+(* Normalisation of set-lifting `[evts]` *)
+(*****************************************)
+
+(*
+ * Replace the expression `[evts]` with the equivalent
+ * expression  `[evts] & id`.
+ * Namely, [tr e1 e2] must output a relation
+ * description that refers explicitly to the two events e1 and e2.
+ *  However, the description of `[evts]` refers to [e1] only.
+ * Indeed this is possible, in the case of an argument of a sequence,
+ * see [tr_seq] below.
+ * To control the arguments [e1] and [e2] for sequence arguments,
+ * we also  transform the (unlikely) sequence
+ * `...;[evts1];[evts2];...` into ...;[evts1&evts2];...`.
+ * That [tr_seq] can identify all cases where the arguments
+ * [e1] and [e2] are the same.
+ *)
+
+let expand_toid loc e = Op (loc,Inter,[e;Var (TxtLoc.none,"id");])
+
+let rec norm_rel e = match e with
+| Konst _|Var _|Op (_,(Cartesian|Add|Tuple),_) -> e
+| Op1 (loc,ToId,_) -> expand_toid loc e
+| Op1 (loc,(Plus|Star|Opt|Comp|Inv as op),e)
+  -> Op1 (loc,op,norm_rel e)
+| Op (loc,(Seq as op),es) ->
+    Op (loc,op,norm_seqs es)
+| Op (loc,(Diff|Union|Inter as op),es) ->
+    Op (loc,op,List.map norm_rel es)
+| If (loc,c,e1,e2) ->
+    If (loc,c,norm_rel e1,norm_rel e2)
+| App (loc,e1,e2) ->
+    App (loc,norm_rel e1,norm_rel e2)
+| Tag _|Bind _|BindRec _|Fun _|ExplicitSet _
+| Match _|MatchSet _|Try _
+    -> e
+
+and norm_seqs =
+  let rec do_rec = function
+    | [] -> [],[]
+    | Op1 (_,ToId,_) as e::es
+      ->
+        let fs,es = do_rec es in
+        e::fs,es
+    | e::es ->
+        let e = norm_rel e in
+        let fs,es = do_rec es in
+        [],e::cons_seqs fs es in
+  function
+    | [] -> []
+    | Op1 (_,ToId,_) as e::es ->
+      let fs,es = do_rec es in
+      cons_seqs (e::fs) es
+    | e::es ->
+        let e = norm_rel e
+        and fs,es = do_rec es in
+        e::cons_seqs fs es
+
+and cons_seqs (fs:exp list) (es:exp list) =
+  match fs with
+  | [] -> es
+  | [f] -> f::es
+  | fs ->
+      let fs =
+        List.map (function (Op1 (_,ToId,f)) -> f | _ -> assert false) fs in
+      Op1 (TxtLoc.none,ToId,Op (TxtLoc.none,Inter,fs))::es
+
+(***********************)
+(* To natural language *)
+(***********************)
 
     let nodefs = ref StringSet.empty
 
@@ -147,9 +220,14 @@ module Make
 
     let next_indent indent = indent ^ "  "
 
-    let next_event = function
-      | 1 -> 3
-      | n -> n+1
+    module Next : sig
+      val reset : unit -> unit
+      val next : unit -> int
+    end = struct
+      let c = ref 1
+      let reset () = c := 1
+      let next () = let r = !c in incr c ; r
+    end
 
     let pp_evt k = sprintf "E\\textsubscript{%d}" k
 
@@ -191,7 +269,7 @@ module Make
     let rec get_type = function
       | Konst (_,(Empty ty|Universe ty)) -> Some ty
       | Op (_,(Seq|Cartesian),_)
-      | Op1 (_,(ToId|Star|Plus),_)
+      | Op1 (_,(ToId|Star|Plus|Inv),_)
         -> Some RLN
       | If (_,_,e1,e2) ->
          get_type2 e1 e2
@@ -305,6 +383,10 @@ module Make
               mk_list Inter [tr a; c;]
          end
 
+    let flatten_if_not =
+      if O.flatten then Fun.id
+      else ASTUtils.flatten
+
     let rec tr_rel e1 e2 = function
       | Konst (loc,Empty _) ->
          tr_rel_id e1 e2 loc "norel"
@@ -321,7 +403,7 @@ module Make
       | Op (_,Diff,[a;b]) ->
          tr_rel_diff e1 e2 a b
       | Op (_,Cartesian,[a;b;]) ->
-         let a = tr_evts e1 a and b = tr_evts e2 b in
+         let a = tr_evts_from_rel e1 a and b = tr_evts_from_rel e2 b in
          mk_list Cartesian [a;b;]
       | Var (loc,id) ->
          tr_rel_id e1 e2 loc id
@@ -341,7 +423,7 @@ module Make
       | Op1 (loc,ToId,Konst (_,Universe _)) ->
          tr_rel_id e1 e2 loc "id"
       | Op1 (_,ToId,e) ->
-         tr_evts e1 e
+         tr_evts_from_rel e1 e
       | Op1 (_,Inv,Op (loc2,Seq,es)) ->
          let es =
            List.rev_map
@@ -368,8 +450,10 @@ module Make
          Item (txt1 ^ txt2)
       | e -> tr_fail (ASTUtils.exp2loc e)
 
+    and tr_evts_from_rel e1 e2 = tr_evts e1 @@ flatten_if_not e2
+
     and tr_rel_not e1 e2 = function
-      | Op1 (_,ToId,e) -> tr_evts_not e1 e
+      | Op1 (_,ToId,e) -> tr_evts_not e1 @@ flatten_if_not e
       | e -> notItem (tr_rel e1 e2 e)
 
     and tr_op e1 e2 op es = List.map (tr_rel e1 e2) es |> mk_list op
@@ -419,7 +503,7 @@ module Make
          tr_rel e1 e2 id
          ::tr_seq e1 e2 es
       | Op1 (_,ToId,e)::es ->
-         tr_evts e1 e::tr_seq e1 e2 es
+         tr_evts_from_rel e1 e::tr_seq e1 e2 es
       | [e] ->
          [tr_rel e1 e2 e]
       | Var (loc1,id1)::Op1 (_,Opt,Var (loc2,id2))::es ->
@@ -427,7 +511,7 @@ module Make
            match es with
            | [] -> e1,e2,e2
            | _::_ ->
-              e1,next_event e1,e2 in
+              e1,Next.next (),e2 in
          Item
            (sprintf
             "\\%s{%s}{either  %s} or \\%s{an Effect which}{%s}"
@@ -435,9 +519,9 @@ module Make
             (pp_id loc2 id2) (pp_evt e3))
          ::tr_seq e3 e2 es
       | [e;Op1 (_,ToId,f);] ->
-         [tr_rel e1 e2 e; tr_evts e2 f;]
+         [tr_rel e1 e2 e; tr_evts_from_rel e2 f;]
       | e::es ->
-         let e3 = next_event e1 in
+         let e3 = Next.next () in
          tr_rel e1 e3 e::tr_seq e3 e2 es
 
     and notItem = function
@@ -468,7 +552,7 @@ module Make
            | Some r -> r
          end
       | Op (loc,Inter,es)
-           when List.for_all ASTUtils.is_var es
+           when O.flatten && List.for_all ASTUtils.is_var es
         ->
          let id =
            List.map (function Var (_,id) -> id | _ -> assert false) es
@@ -530,6 +614,8 @@ module Make
         (fun loc id -> tr_evts_id e1 loc id)
         a b
 
+    let tr_rel e1 e2 e = tr_rel e1 e2 @@ norm_rel e
+
     (*********************************)
     (* Flatten associative operators *)
     (*********************************)
@@ -563,6 +649,37 @@ module Make
            | t ->
               t::flatten_op op es
          end
+
+    let rec rm_dups = function
+      | List ((Inter|Union|Seq as op),intro_txt,sep_txt,ts)
+        ->
+         List (op,intro_txt,sep_txt,rm_dups_args ts)
+      | List (op,txt,s,ts) ->
+         List (op,txt,s,List.map rm_dups ts)
+      | DiffPair (e1,e2) ->
+         DiffPair (rm_dups e1,rm_dups e2)
+      | IfCond (txt,e1,e2) ->
+         IfCond (txt,rm_dups e1,rm_dups e2)
+      | Item _ as t -> t
+
+    and rm_dups_args ts =
+      let ts = List.map rm_dups ts in
+      rm_items ts
+
+    and rm_items =
+
+      let rec do_rec = function
+        | [] -> StringSet.empty,[]
+        | Item s as e::es ->
+            let seen,es = do_rec es in
+            if StringSet.mem s seen then
+            seen,es
+          else
+            StringSet.add s seen,e::es
+      | e::es ->
+          let seen,es = do_rec es in
+          seen,e::es in
+      fun es -> let _,es = do_rec es in es
 
     (*********************************)
     (* Pretty print nested structure *)
@@ -649,6 +766,7 @@ module Make
       | Some _ as r -> r
 
     let tr_def loc id d =
+      Next.reset () ;
       let ty = get_id_e_type id d in
       if O.verbose > 0 then begin
         match ty with
@@ -661,14 +779,21 @@ module Make
               | SET -> "an event set"
               | RLN -> "a relation")
         end ;
-        let tr =
+        let es,tr =
         match ty with
-        | Some RLN -> tr_rel 1 2
-        | Some SET -> tr_evts 1
+        | Some RLN ->
+            let e1 = Next.next () in
+            let e2 = Next.next () in
+            [| e1; e2; |],tr_rel e1 e2
+        | Some SET ->
+            let e = Next.next () in
+            [| e |],tr_evts e
         | None ->
            eprintf "%a: Cannot find type of %s\n"
              TxtLoc.pp loc id ;
-           tr_rel 1 2 in
+           let e1 = Next.next () in
+           let e2 = Next.next () in
+           [| e1; e2; |],tr_rel e1 e2 in
       let pref =
         match ty with
         | Some RLN|None ->
@@ -678,16 +803,16 @@ module Make
              "%s if"
              (makeuppercase
               @@ sprintf "\\%s{an Effect %s}{an Effect %s}"
-                   def_txt (pp_evt 1) (pp_evt 2))
+                   def_txt (pp_evt es.(0)) (pp_evt es.(1)))
         | Some SET ->
            sprintf
              "%s if"
              (makeuppercase
               @@ sprintf "\\%s{an Effect %s}"
-                   (pp_id loc id) (pp_evt 1)) in
+                   (pp_id loc id) (pp_evt es.(0))) in
       let d =
         if O.flatten then
-         ASTUtils.flatten d |> tr |> flatten_out 
+         ASTUtils.flatten d |> tr |> flatten_out |> rm_dups
         else tr d in
       pp_def pref "." d ;
       if O.testmode || StringSet.cardinal O.names > 1 then printf "\\par\n"

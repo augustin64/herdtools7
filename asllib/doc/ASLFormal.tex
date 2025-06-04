@@ -116,8 +116,15 @@ which is defined next is named $q$.
 
 \hypertarget{def-cartimes}{}
 \begin{definition}[Cartesian Product]
-    The \emph{Cartesian product} of sets $A$ and $B$, denoted $A \cartimes B$
+    The \emph{Cartesian product} of sets $A$ and $B$, denoted $A \cartimes B$,
     is $A \cartimes B \triangleq \{(a,b) \;|\; a \in A, b \in B\}$.
+\end{definition}
+
+\hypertarget{def-graphtransitive}{}
+\hypertarget{def-graphtransitivereflexive}{}
+\begin{definition}[Transitive Closure of a Relation]
+We denote the transitive closure of a relation $E = V \times V$ by $\graphtransitive{E}$
+and the reflexive-transitive closure of $E$ by $\graphtransitivereflexive{E}$.
 \end{definition}
 
 \hypertarget{def-partialfunc}{}
@@ -234,6 +241,10 @@ stands for $V(a_1) \ldots V(a_k)$ where $a_{1..k}$ is an arbitrary ordering of t
 
 We write $T^*$ to denote a the type of a possibly-empty list of elements of type $T$,
 and $T^+$ for a non-empty list of elements of type $T$.
+
+\hypertarget{def-inlist}{}
+We slightly abuse notation by employing the notation for set membership to lists.
+Formally, the notation $e \inlist L$ where $e \in T$ and $L \in T^*$ stands for $\exists i\in\N.\ L[i]=e$.
 
 \hypertarget{def-listset}{}
 \begin{definition}[Listing a Set]
@@ -367,7 +378,7 @@ It relies on the helper function $\uniquep$:
 \uniquep(\emptylist, \acc) &\triangleq& \acc\\
 \uniquep([h] \concat t, \acc) &\triangleq&
   \begin{cases}
-    \uniquep(t, \acc) & \text{if }h \in t\\
+    \uniquep(t, \acc) & \text{if }h \inlist t\\
     \uniquep(t, \acc \concat [h]) & \text{otherwise}\\
   \end{cases}
 \end{array}
@@ -1004,6 +1015,6 @@ The notation $\wrappedline$ denotes that a line that is longer than the page wid
 \hypertarget{def-commonsuffixline}{}
 \item The notation $\commonsuffixline$ serves as a visual aid to delimit a common suffix of premises shared by rule cases.
 
-\hypertarget{tododefine}{}
+\hypertarget{tododefine}{} % DO NOT LINT
 \item \tododefine{Missing:} Red hyperlinks indicate items that are yet to be defined.
 \end{itemize}

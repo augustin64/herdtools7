@@ -178,7 +178,7 @@
 \setlist[itemize,19]{label=\textendash}
 \setlist[itemize,20]{label=\textendash}
 
-\newcommand\tododefine[1]{\hyperlink{tododefine}{\color{red}{\texttt{#1}}}}
+\newcommand\tododefine[1]{\hyperlink{tododefine}{\color{red}{\texttt{#1}}}} % DO NOT LINT
 \newcommand\lrmcomment[1]{}
 \newcommand\textfunc[1]{\textit{#1}}
 \newcommand\ProseParagraph[0]{\subsubsection{Prose}}
@@ -190,8 +190,8 @@
 \newcommand\OneApplies[0]{One of the following applies:}
 \newcommand\Proseeqdef[2]{define #1 as #2}
 \newcommand\ProseEqdef[2]{Define #1 as #2}
-\newcommand\ExampleDef[1]{\subsubsection{Example: #1\label{Example:#1}}}
-\newcommand\ExampleRef[1]{Example~\ref{Example:#1}}
+\newcommand\ExampleDef[1]{\hypertarget{example-#1}{}\subsubsection{Example: #1}} % DO NOT LINT
+\newcommand\ExampleRef[1]{\hyperlink{example-#1}{Example: #1}} % DO NOT LINT
 
 \ifcode
 % First argument is \<rule>Begin, second is \<rule>End, third is the file name.
@@ -283,6 +283,7 @@
 \newcommand\filterlist[0]{\hyperlink{def-filterlist}{\textfunc{filter\_list}}}
 \newcommand\unziplist[0]{\hyperlink{def-unziplist}{\textfunc{unzip}}}
 \newcommand\unziplistthree[0]{\hyperlink{def-unziplistthree}{\textfunc{unzip3}}}
+\newcommand\inlist[0]{\hyperlink{def-inlist}{\in}}
 \newcommand\uniquep[0]{\hyperlink{def-uniquep}{\textfunc{unique'}}}
 \newcommand\uniquelist[0]{\hyperlink{def-uniquelist}{\textfunc{unique}}}
 \newcommand\listset[0]{\hyperlink{def-listset}{\textfunc{list\_set}}}
@@ -313,7 +314,8 @@
 \newcommand\funcgraph[0]{\hyperlink{def-funcgraph}{\texttt{func\_graph}}}
 \DeclareMathOperator{\dom}{\hyperlink{def-dom}{dom}}
 \newcommand\sign[0]{\hyperlink{def-sign}{\texttt{sign}}}
-\newcommand\graphtransitive[1]{#1^{\hyperlink{def-graphtransitive}{*}}}
+\newcommand\graphtransitive[1]{#1^{\hyperlink{def-graphtransitive}{+}}}
+\newcommand\graphtransitivereflexive[1]{#1^{\hyperlink{def-graphtransitivereflexive}{*}}}
 
 \newcommand\configdomain[1]{\hyperlink{def-configdomain}{\texttt{config\_dom}}({#1})}
 
@@ -321,7 +323,7 @@
 \newcommand\terminateas[0]{\hyperlink{def-terminateas}{\sslash}\;}
 \newcommand\booltrans[1]{\hyperlink{def-booltrans}{\textfunc{bool\_transition}}(#1)}
 \newcommand\booltransarrow[0]{\longrightarrow}
-\newcommand\checktrans[2]{\hyperlink{def-checktrans}{\textfunc{check}}(#1, \texttt{#2})}
+\newcommand\checktrans[2]{\hyperlink{def-checktrans}{\textfunc{check}}\left(#1, \texttt{#2}\right)}
 \newcommand\Prosechecktrans[2]{\hyperlink{def-checktrans}{checking} #1 yields $\True$\ProseTerminateAs{#2}}
 \newcommand\checktransarrow[0]{\longrightarrow}
 
@@ -490,11 +492,11 @@
 \newcommand\Nignoredoridentifier[0]{\hyperlink{def-nignoredoridentifier}{\nonterminal{ignored\_or\_identifier}}}
 \newcommand\Nty[0]{\hyperlink{def-nty}{\nonterminal{ty}}}
 \newcommand\Nexpr[0]{\hyperlink{def-nexpr}{\nonterminal{expr}}}
+\newcommand\Naccess[0]{\hyperlink{def-naccess}{\nonterminal{access}}}
 \newcommand\Nbasiclexpr[0]{\hyperlink{def-nbasiclexpr}{\nonterminal{basic\_lexpr}}}
-\newcommand\Nnestedfields[0]{\hyperlink{def-nnestedfields}{\nonterminal{nested\_fields}}}
-\newcommand\Nslicedbasiclexpr[0]{\hyperlink{def-nslicedbasiclexpr}{\nonterminal{sliced\_basic\_lexpr}}}
-\newcommand\Ndiscardorslicedbasiclexpr[0]{\hyperlink{def-ndiscardorslicedbasiclexpr}{\nonterminal{discard\_or\_sliced\_basic\_lexpr}}}
+\newcommand\Ndiscardorbasiclexpr[0]{\hyperlink{def-ndiscardorbasiclexpr}{\nonterminal{discard\_or\_basic\_lexpr}}}
 \newcommand\Ndiscardoridentifier[0]{\hyperlink{def-ndiscardoridentifier}{\nonterminal{discard\_or\_identifier}}}
+\newcommand\Nsetteraccess[0]{\hyperlink{def-nsetteraccess}{\nonterminal{setter\_access}}}
 \newcommand\Nlexpr[0]{\hyperlink{def-nlexpr}{\nonterminal{lexpr}}}
 \newcommand\Nfields[0]{\hyperlink{def-nfields}{\nonterminal{fields}}}
 \newcommand\Nfieldsopt[0]{\hyperlink{def-nfieldsopt}{\nonterminal{fields\_opt}}}
@@ -615,6 +617,9 @@
 \newcommand\spec[0]{\hyperlink{ast-spec}{\textsf{spec}}}
 \newcommand\typedidentifier[0]{\hyperlink{ast-typedidentifier}{\textsf{typed\_identifier}}}
 \newcommand\lhsaccess[0]{\hyperlink{ast-lhsaccess}{\textsf{lhs\_access}}}
+\newcommand\fieldorarrayaccess[0]{\hyperlink{ast-fieldorarrayaccess}{\textsf{field\_or\_array\_access}}}
+\newcommand\FieldAccess[0]{\hyperlink{ast-fieldaccess}{\textsf{FieldAccess}}}
+\newcommand\ArrayAccess[0]{\hyperlink{ast-arrayaccess}{\textsf{ArrayAccess}}}
 \newcommand\localdeclkeyword[0]{\hyperlink{ast-localdeclkeyword}{\textsf{local\_decl\_keyword}}}
 \newcommand\globaldeclkeyword[0]{\hyperlink{ast-globaldeclkeyword}{\textsf{global\_decl\_keyword}}}
 \newcommand\localdeclitem[0]{\hyperlink{ast-localdeclitem}{\textsf{local\_decl\_item}}}
@@ -788,6 +793,8 @@
 \newcommand\builddeclitem[0]{\hyperlink{build-declitem}{\textfunc{build\_decl\_item}}}
 \newcommand\makesetter[0]{\hyperlink{def-makesetter}{\textfunc{make\_setter}}}
 \newcommand\desugarsetter[0]{\hyperlink{def-desugarsetter}{\textfunc{desugar\_setter}}}
+\newcommand\desugarsettersetfields[0]{\hyperlink{def-desugarsettersetfields}{\textfunc{desugar\_setter\_setfields}}}
+\newcommand\readmodifywrite[0]{\hyperlink{def-readmodifywrite}{\textfunc{read\_modify\_write}}}
 \newcommand\desugaraccessorpair[0]{\hyperlink{def-desugaraccessorpair}{\textfunc{desugar\_accessor\_pair}}}
 \newcommand\buildlooplimit[0]{\hyperlink{build-looplimit}{\textfunc{build\_looplimit}}}
 \newcommand\buildrecurselimit[0]{\hyperlink{build-recurselimit}{\textfunc{build\_recurselimit}}}
@@ -796,9 +803,8 @@
 \newcommand\buildexpr[0]{\hyperlink{build-expr}{\textfunc{build\_expr}}}
 \newcommand\buildlexpr[0]{\hyperlink{build-lexpr}{\textfunc{build\_lexpr}}}
 \newcommand\buildbasiclexpr[0]{\hyperlink{build-basiclexpr}{\textfunc{build\_basic\_lexpr}}}
-\newcommand\buildnestedfields[0]{\hyperlink{build-nestedfields}{\textfunc{build\_nested\_fields}}}
-\newcommand\buildslicedbasiclexpr[0]{\hyperlink{build-slicedbasiclexpr}{\textfunc{build\_sliced\_basic\_lexpr}}}
-\newcommand\builddiscardorslicedbasiclexpr[0]{\hyperlink{build-discardorslicedbasiclexpr}{\textfunc{build\_discard\_or\_sliced\_basic\_lexpr}}}
+\newcommand\builddiscardorbasiclexpr[0]{\hyperlink{build-discardorbasiclexpr}{\textfunc{build\_discard\_or\_basic\_lexpr}}}
+\newcommand\buildaccess[0]{\hyperlink{build-access}{\textfunc{build\_access}}}
 \newcommand\builddiscardoridentifier[0]{\hyperlink{build-discardoridentifier}{\textfunc{build\_discard\_or\_identifier}}}
 \newcommand\desugarlhsaccess[0]{\hyperlink{def-desugarlhsaccess}{\textfunc{desugar\_lhs\_access}}}
 \newcommand\desugarlhsaccessopt[0]{\hyperlink{def-desugarlhsaccessopt}{\textfunc{desugar\_lhs\_access\_opt}}}
@@ -877,6 +883,8 @@
 \newcommand\REidentifier[0]{\hyperlink{def-reidentifier}{\texttt{<}\textsf{identifier}\texttt{>}}}
 \newcommand\RElinecomment[0]{\hyperlink{def-relinecomment}{\texttt{<}\textsf{line\_comment}\texttt{>}}}
 \newcommand\REwhitespace[0]{\hyperlink{def-rewhitespace}{\texttt{<}\textsf{whitespace}\texttt{>}}}
+\newcommand\shiftleftlexeme[0]{\texttt{"<}\texttt{<"}}
+\newcommand\shiftrightlexeme[0]{\texttt{">}\texttt{>"}}
 
 \newcommand\parsearrow[0]{\xrightarrow{\hyperlink{def-aslparse}{\textsf{parse}}}}
 \newcommand\aslparse[0]{\hyperlink{def-aslparse}{\textfunc{asl\_parse}}}
@@ -956,9 +964,7 @@
 \newcommand\callparams[0]{\text{params}}
 \newcommand\callargs[0]{\text{args}}
 \newcommand\callcalltype[0]{\text{call\_type}}
-\newcommand\lhsaccessbase[0]{\text{base}}
-\newcommand\lhsaccessindex[0]{\text{index}}
-\newcommand\lhsaccessfields[0]{\text{fields}}
+\newcommand\lhsaccessaccess[0]{\text{access}}
 \newcommand\lhsaccessslices[0]{\text{slices}}
 \newcommand\accessorpairgetter[0]{\text{getter}}
 \newcommand\accessorpairsetter[0]{\text{setter}}
@@ -1284,7 +1290,6 @@
 \newcommand\isglobalundefined[0]{\hyperlink{def-isglobalundefined}{\textfunc{is\_global\_undefined}}}
 \newcommand\islocalundefined[0]{\hyperlink{def-islocalundefined}{\textfunc{is\_local\_undefined}}}
 \newcommand\isundefined[0]{\hyperlink{def-isundefined}{\textfunc{is\_undefined}}}
-\newcommand\issubprogram[0]{\hyperlink{def-issubprogram}{\textfunc{is\_subprogram}}}
 \newcommand\lookupimmutableexpr[0]{\hyperlink{def-lookupimmutableexpr}{\textfunc{lookup\_immutable\_expr}}}
 \newcommand\addglobalimmutableexpr[0]{\hyperlink{def-addglobalimmutableexpr}{\textfunc{add\_global\_immutable\_expr}}}
 \newcommand\addlocalimmutableexpr[0]{\hyperlink{def-addlocalimmutableexpr}{\textfunc{add\_local\_immutable\_expr}}}
@@ -1359,8 +1364,6 @@
 \newcommand\RecursiveCall[0]{\hyperlink{def-recursivecall}{\textsf{RecursiveCall}}}
 \newcommand\PerformsAssertions[0]{\hyperlink{def-performsassertions}{\textsf{PerformsAssertions}}}
 \newcommand\NonDeterministic[0]{\hyperlink{def-nondeterministic}{\textsf{NonDeterministic}}}
-
-\newcommand\propagatedeffects[0]{\textfunc{propagated\_effects}}
 
 % sets of side effect descriptors
 \newcommand\timeframe[0]{\hyperlink{def-sideeffecttimeframe}{\textfunc{time\_frame}}}
@@ -1540,9 +1543,9 @@
 \newcommand\errorcodesterm[0]{\hyperlink{def-errorcodeterm}{error codes}}
 \newcommand\staticerrorterm[0]{\hyperlink{def-staticerrorterm}{static error}}
 \newcommand\staticerrorsterm[0]{\hyperlink{def-staticerrorterm}{static errors}}
-\newcommand\typingerrorterm[0]{\hyperlink{def-typingerrorterm}{typing error}}
-\newcommand\typingerrorsterm[0]{\hyperlink{def-typingerrorterm}{typing errors}}
-\newcommand\Typingerrorsterm[0]{\hyperlink{def-typingerrorterm}{Typing errors}}
+\newcommand\typingerrorterm[0]{\hyperlink{def-typingerrorterm}{type error}}
+\newcommand\typingerrorsterm[0]{\hyperlink{def-typingerrorterm}{type errors}}
+\newcommand\Typingerrorsterm[0]{\hyperlink{def-typingerrorterm}{Type errors}}
 \newcommand\builderrorsterm[0]{\hyperlink{def-builderrorterm}{build errors}}
 \newcommand\Builderrorsterm[0]{\hyperlink{def-builderrorterm}{Build errors}}
 \newcommand\dynamicerrorterm[0]{\hyperlink{def-dynamicerrorterm}{dynamic error}}
@@ -1599,6 +1602,7 @@
 \newcommand\namedtypeterm[0]{\hyperlink{namedtypeterm}{named type}}
 \newcommand\namedtypesterm[0]{\hyperlink{namedtypeterm}{named types}}
 \newcommand\recordtypeterm[0]{\hyperlink{recordtypeterm}{record type}}
+\newcommand\exceptiontypeterm[0]{\hyperlink{exceptiontypeterm}{exception type}}
 \newcommand\collectiontypeterm[0]{\hyperlink{collectiontypeterm}{collection type}}
 \newcommand\collectiontypesterm[0]{\hyperlink{collectiontypeterm}{collection types}}
 \newcommand\recordtypesterm[0]{\hyperlink{recordtypeterm}{record types}}
@@ -1627,6 +1631,7 @@
 \newcommand\arrayaccess[0]{\hyperlink{def-arrayaccess}{array access}}
 \newcommand\symbolicallysimplifies[0]{\hyperlink{def-symbolicallysimplifies}{symbolically simplifies}}
 \newcommand\Prosesingulartype[0]{\hyperlink{def-issingular}{singular type}}
+\newcommand\Prosesingulartypes[0]{\hyperlink{def-issingular}{singular types}}
 
 \newcommand\nativevalue[0]{\hyperlink{def-nativevalue}{native value}}
 \newcommand\executiongraph[0]{\hyperlink{def-executiongraph}{execution graph}}
@@ -1668,6 +1673,7 @@
 \newcommand\exactconstraintterm[0]{\hyperlink{def-exactconstraintterm}{exact constraint}}
 \newcommand\Proseexactconstraint[1]{\hyperlink{def-exactconstraintterm}{exact constraint} for the expression #1}
 \newcommand\rangeconstraintterm[0]{\hyperlink{def-rangeconstraintterm}{range constraint}}
+\newcommand\rangeconstraintsterm[0]{\hyperlink{def-rangeconstraintterm}{range constraints}}
 \newcommand\Proserangeconstraint[2]{\hyperlink{def-rangeconstraintterm}{range constraint} for the lower end expression #1 and upper end expression #2}
 
 %% Expression macros
@@ -1766,7 +1772,8 @@
 \newcommand\ReadGlobalTerm[0]{\hyperlink{def-readglobalterm}{global read side effect descriptor}}
 \newcommand\WriteGlobalTerm[0]{\hyperlink{def-writeglobalterm}{global write side effect descriptor}}
 \newcommand\ThrowExceptionTerm[0]{\hyperlink{def-throwexceptionterm}{exception side effect descriptor}}
-\newcommand\RecursiveCallTerm[0]{\hyperlink{def-recursivecallterm}{recursive call side effect  descriptor}}
+\newcommand\RecursiveCallTerm[0]{\hyperlink{def-recursivecallterm}{recursive call side effect descriptor}}
+\newcommand\RecursiveCallTerms[0]{\hyperlink{def-recursivecallterm}{recursive call side effect descriptors}}
 \newcommand\PerformsAssertionsTerm[0]{\hyperlink{def-performsassertionsterm}{assertion side effect descriptor}}
 \newcommand\NonDeterministicTerm[0]{\hyperlink{def-nondeterministicterm}{non-determinism side effect descriptor}}
 
@@ -1842,9 +1849,12 @@
 \newcommand\checkvarnotingenv[1]{\hyperlink{def-checkvarnotingenv}{\textfunc{check\_var\_not\_in\_genv}}(#1)}
 \newcommand\checknoprecisionloss[1]{\hyperlink{def-checknoprecisionloss}{\textfunc{check\_no\_precision\_loss}}(#1)}
 \newcommand\precisionjoin[0]{\hyperlink{def-precisionjoin}{\textfunc{precision\_join}}}
-\newcommand\Prosenoprecisionloss[1]{determining whether #1 has been computed with no precision loss using $\checknoprecisionloss$ yields $\True$\ProseOrTypeError}
+\newcommand\Prosenoprecisionloss[1]{determining whether #1 has been computed with no precision loss via\\
+    $\checknoprecisionloss$ yields $\True$\ProseOrTypeError}
 \newcommand\annotatesubprogram[0]{\hyperlink{def-annotatesubprogram}{\textfunc{annotate\_subprogram}}}
-\newcommand\Proseannotatesubprogram[3]{\hyperlink{def-annotatesubprogram}{annotating} the subprogram definition #1 in the static environment #2 yields the subprogram definition #3}
+\newcommand\Proseannotatesubprogram[5]{\hyperlink{def-annotatesubprogram}{annotating} the subprogram definition #2
+  in the static environment #1 with \sideeffectdescriptorsetsterm{} #3 yields the subprogram definition #4
+  and \sideeffectdescriptorsetsterm{} #5}
 \newcommand\checkstmtreturnsorthrows[0]{\hyperlink{def-checkstmtreturnsorthrows}{\textfunc{check\_stmt\_returns\_or\_throws}}}
 
 \newcommand\controlflowfromstmt[0]{\hyperlink{def-controlflowfromstmt}{\textfunc{control\_flow\_from\_stmt}}}
@@ -1968,15 +1978,15 @@
 %% Build Error Codes
 \newcommand\BuildErrorPrefix[0]{\texttt{BE}}
 \newcommand\BuildErrorCode[1]{\texttt{\BuildErrorPrefix\_#1}}
-\newcommand\LexicalError[0]{\hyperlink{def-lexicalerrorresult}{\BuildErrorCode{LE}}}
-\newcommand\LexicalErrorConfig[0]{\texttt{\#}\LexicalError}
+\newcommand\LexicalError[0]{\hyperlink{def-lexicalerrorresult}{\texttt{\#}\BuildErrorCode{LE}}}
+\newcommand\LexicalErrorConfig[0]{\LexicalError}
 \newcommand\ParseError[0]{\hyperlink{def-parseerror}{\BuildErrorCode{PE}}}
-\newcommand\ParseErrorConfig[0]{\hyperlink{def-parseerror}{\#\BuildErrorCode{PE}}}
+\newcommand\ParseErrorConfig[0]{\hyperlink{def-parseerror}{\texttt{\#}\BuildErrorCode{PE}}}
 \newcommand\ReservedIdentifier[0]{\hyperlink{def-reservedidentifier}{\BuildErrorCode{RI}}}
 \newcommand\BinopPrecedence[0]{\hyperlink{def-binopprecedence}{\BuildErrorCode{BOP}}}
 \newcommand\BuildBadDeclaration[0]{\hyperlink{def-buildbaddeclaration}{\BuildErrorCode{BD}}}
 
-%% Typing Error Codes
+%% Type Error Codes
 \newcommand\TypeErrorPrefix[0]{\texttt{TE}}
 \newcommand\TypeErrorCode[1]{\texttt{\TypeErrorPrefix\_#1}}
 \newcommand\UndefinedIdentifier[0]{\hyperlink{def-undefinedidentifier}{\TypeErrorCode{UI}}}
@@ -2277,6 +2287,7 @@
 \newcommand\neweopt[0]{\texttt{new\_e\_opt}}
 \newcommand\newenv[0]{\texttt{new\_env}}
 \newcommand\newenvandfs[0]{\texttt{new\_env\_and\_fs}}
+\newcommand\newf[0]{\texttt{new\_f}}
 \newcommand\newfield[0]{\texttt{new\_field}}
 \newcommand\newfields[0]{\texttt{new\_fields}}
 \newcommand\newfuncdef[0]{\texttt{new\_func\_def}}
@@ -2362,6 +2373,7 @@
 \newcommand\slicesone[0]{\texttt{slices1}}
 \newcommand\slicesp[0]{\texttt{slices'}}
 \newcommand\slicestwo[0]{\texttt{slices2}}
+\newcommand\slicesannotated[0]{\texttt{slices\_annotated}}
 \newcommand\slicetwo[0]{\texttt{slice2}}
 \newcommand\sm[0]{\texttt{s\_m}}
 \newcommand\smnew[0]{\texttt{s\_m\_new}}
@@ -2423,11 +2435,13 @@
 \newcommand\va[0]{\texttt{a}}
 \newcommand\vapprox[0]{\texttt{approx}}
 \newcommand\vap[0]{\texttt{a'}}
+\newcommand\vaccess[0]{\texttt{access}}
 \newcommand\vaccessors[0]{\texttt{accessors}}
 \newcommand\vaccessorpair[0]{\texttt{accessor\_pair}}
 \newcommand\vabsname[0]{\texttt{absolute\_name}}
 \newcommand\vabsslice[0]{\texttt{absolute\_slice}}
 \newcommand\vabsslices[0]{\texttt{absolute\_slices}}
+\newcommand\vsetteraccess[0]{\texttt{setter\_access}}
 \newcommand\vslicesasindices[0]{\texttt{slices\_as\_indices}}
 \newcommand\vabsoluteparent[0]{\texttt{absolute\_parent}}
 \newcommand\vabsbitfields[0]{\texttt{abs\_bitfields}}
@@ -2613,7 +2627,6 @@
 \newcommand\vh[0]{\texttt{h}}
 \newcommand\vhp[0]{\texttt{h'}}
 \newcommand\vlhsaccess[0]{\texttt{lhs\_access}}
-\newcommand\vlhsaccesses[0]{\texttt{lhs\_accesses}}
 \newcommand\vlhsaccessopt[0]{\texttt{lhs\_access\_opt}}
 \newcommand\vlhsaccessopts[0]{\texttt{lhs\_access\_opts}}
 \newcommand\vlocal[0]{\texttt{local}}
@@ -2713,7 +2726,6 @@
 \newcommand\vnamet[0]{\texttt{name\_t}}
 \newcommand\vneg[0]{\texttt{neg}}
 \newcommand\vnested[0]{\texttt{nested}}
-\newcommand\vnestedfields[0]{\texttt{nested\_fields}}
 \newcommand\vnextlimitopt[0]{\texttt{next\_limit\_opt}}
 \newcommand\vnew[0]{\texttt{new}}
 \newcommand\vnonmatching[0]{\texttt{nonmatching}}
@@ -2774,6 +2786,7 @@
 \newcommand\vsesinitialvalue[0]{\texttt{ses\_initial\_value}}
 \newcommand\vsesbase[0]{\texttt{ses\_base}}
 \newcommand\vsesf[0]{\texttt{ses\_f}}
+\newcommand\vsesfnorecursives[0]{\texttt{ses\_f\_no\_recursives}}
 \newcommand\vsesfone[0]{\texttt{ses\_f1}}
 \newcommand\vsescatchers[0]{\texttt{ses\_catchers}}
 \newcommand\vseswithparams[0]{\texttt{ses\_with\_params}}
@@ -2806,6 +2819,7 @@
 \newcommand\vsesfiltered[0]{\texttt{ses\_filtered}}
 \newcommand\vsesone[0]{\texttt{ses1}}
 \newcommand\vsestwo[0]{\texttt{ses2}}
+\newcommand\sesslices[0]{\texttt{ses\_slices}}
 \newcommand\vsesthree[0]{\texttt{ses3}}
 \newcommand\vsesoffset[0]{\texttt{ses\_offset}}
 \newcommand\vseslength[0]{\texttt{ses\_length}}
@@ -2820,9 +2834,7 @@
 \newcommand\newses[0]{\texttt{new\_ses}}
 \newcommand\vslice[0]{\texttt{slice}}
 \newcommand\vnewslice[0]{\texttt{new\_slice}}
-\newcommand\vsliced[0]{\texttt{sliced}}
 \newcommand\vsliceasts[0]{\texttt{slice\_asts}}
-\newcommand\vslicedbasiclexpr[0]{\texttt{sliced\_basic\_lexpr}}
 \newcommand\vsliceone[0]{\texttt{slice1}}
 \newcommand\vslicetwo[0]{\texttt{slice2}}
 \newcommand\vslices[0]{\texttt{slices}}
@@ -3026,7 +3038,6 @@
 \newcommand\addten[0]{\texttt{add\_10}}
 \newcommand\addtenone[0]{\texttt{add\_10-1}}
 \newcommand\factorial[0]{\texttt{factorial}}
-\newcommand\rotate[0]{\texttt{rotate}}
 \newcommand\declaredparam[0]{\texttt{declared\_param}}
 \newcommand\caninsertstdlibparam[0]{\texttt{can\_insert\_stdlib\_param}}
 \newcommand\inferredparameters[0]{\texttt{inferred\_parameters}}
@@ -3050,3 +3061,17 @@
 \newcommand\plf[0]{\texttt{plf}}
 \newcommand\vsapprox[0]{\texttt{s\_approx}}
 \newcommand\intervals[0]{\texttt{intervals}}
+\newcommand\funcidtoses[0]{\texttt{func\_id\_to\_ses}}
+\newcommand\funcidtosesminusrec[0]{\texttt{func\_id\_to\_ses\_minus\_rec}}
+\newcommand\callgraph[0]{\texttt{call\_graph}}
+\newcommand\transitivecallgraph[0]{\texttt{transitive\_call\_graph}}
+\newcommand\callees[0]{\texttt{callees}}
+\newcommand\vsucc[0]{\texttt{succ}}
+\newcommand\countgone[0]{\texttt{count\_g1}}
+\newcommand\countgtwo[0]{\texttt{count\_g2}}
+\newcommand\increment[0]{\texttt{increment}}
+\newcommand\incrementone[0]{\texttt{increment-1}}
+\newcommand\BitsArray[0]{\texttt{BitsArray}}
+\newcommand\undeclaredidentifier[0]{\texttt{undeclared\_identifier}}
+\newcommand\fldone[0]{\texttt{fld1}}
+\newcommand\fldtwo[0]{\texttt{fld2}}

@@ -2033,7 +2033,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         *)
         let+ () =
           check_true (Types.is_named ty) (fun () ->
-              failwith "Typing error: should be a named type")
+              fatal_from ~loc (Error.ExpectedNamedType ty))
         in
         best_effort (ty, e, SES.empty) @@ fun _ ->
         let field_types =
@@ -2432,7 +2432,7 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
             let slice = Slice_Length (zero, e) in
             E_Slice (zero, [ slice ]) |> here)
     | T_Enum [] -> assert false
-    | T_Enum (name :: _) -> lookup_constants env name |> lit
+    | T_Enum (name :: _) -> lookup_constant env name |> lit
     | T_Int UnConstrained -> L_Int Z.zero |> lit
     | T_Int (Parameterized (_, id)) -> E_Var id |> here |> fatal_non_static
     | T_Int PendingConstrained -> assert false
@@ -2581,25 +2581,26 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         match t_le1_anon.desc with
         | T_Bits _ ->
             let le2, ses1 = annotate_lexpr env le1 t_le1 in
+            let slices_annotated, ses_slices =
+              best_effort (slices, SES.empty) @@ fun _ ->
+              annotate_slices env slices ~loc
+            in
             let+ () =
              fun () ->
               let width =
-                slices_width env slices |> StaticModel.try_normalize env
+                slices_width env slices_annotated
+                |> StaticModel.try_normalize env
               in
               let t = T_Bits (width, []) |> here in
               check_type_satisfies ~loc env t_e t ()
             in
-            let slices2, ses2 =
-              best_effort (slices, SES.empty) @@ fun _ ->
-              annotate_slices env slices ~loc
-            in
-            let+ () = check_disjoint_slices ~loc env slices2 in
+            let+ () = check_disjoint_slices ~loc env slices_annotated in
             let+ () =
-              check_true (not (list_is_empty slices)) @@ fun () ->
+              check_true (not (list_is_empty slices_annotated)) @@ fun () ->
               fatal_from ~loc Error.EmptySlice
             in
-            let ses = ses_non_conflicting_union ~loc ses1 ses2 in
-            (LE_Slice (le2, slices2) |> here, ses |: TypingRule.LESlice)
+            let ses = ses_non_conflicting_union ~loc ses1 ses_slices in
+            (LE_Slice (le2, slices_annotated) |> here, ses |: TypingRule.LESlice)
         | T_Array (size, t) when le.version = V0 -> (
             match slices with
             | [ Slice_Single e_index ] ->
@@ -4007,9 +4008,11 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
               && Option.is_none f.recurse_limit
             then warn_from ~loc Error.(NoRecursionLimit [ f.name ])
           in
-          let ses_f = SES.remove_calls_recursives ses_f in
+          let ses_f_no_recursives = SES.remove_calls_recursives ses_f in
           let new_d = D_Func new_f |> here
-          and new_env = StaticEnv.add_subprogram new_f.name new_f ses_f env1 in
+          and new_env =
+            StaticEnv.add_subprogram new_f.name new_f ses_f_no_recursives env1
+          in
           (new_d, new_env.global) |: TypingRule.TypecheckDecl
       | D_Func ({ body = SB_Primitive _; _ } as f) ->
           let (new_env, new_f), _ = annotate_and_declare_func ~loc f genv in
@@ -4050,16 +4053,20 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         let pp f ((func_sig : func), ses) =
           fprintf f "@[<h 2>%s:@ %a@]" func_sig.name SES.pp_print ses
         in
-        eprintf "@[<v 2>Propagating side-effects from:@ @[<v 2>[%a]@]@]@."
+        eprintf
+          "propagate_recursive_calls_sess BEGIN: @[<v 2>Propagating \
+           side-effects from:@ @[<v 2>[%a]@]@]@."
           (pp_print_list ~pp_sep pp) sess
     in
-    let map0 =
+    let func_id_to_ses =
       List.map (fun ((f : func), ses) -> (f.name, ses)) sess |> IMap.of_list
     in
-    let call_graph = IMap.map (fun ses -> SES.get_calls_recursives ses) map0 in
+    let call_graph =
+      IMap.map (fun ses -> SES.get_calls_recursives ses) func_id_to_ses
+    in
     let transitive_call_graph = transitive_closure call_graph in
-    let map0_without_recursive_calls =
-      IMap.map (fun ses -> SES.remove_calls_recursives ses) map0
+    let func_id_to_ses_minus_rec =
+      IMap.map (fun ses -> SES.remove_calls_recursives ses) func_id_to_ses
     in
     let res =
       List.map
@@ -4068,7 +4075,9 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
             IMap.find func.name transitive_call_graph |> ISet.elements
           in
           let sess =
-            List.map (fun x -> IMap.find x map0_without_recursive_calls) callees
+            List.filter_map
+              (fun x -> IMap.find_opt x func_id_to_ses_minus_rec)
+              callees
           in
           (func, SES.unions (SES.remove_calls_recursives ses :: sess)))
         sess
@@ -4080,7 +4089,9 @@ module Annotate (C : ANNOTATE_CONFIG) : S = struct
         let pp f ((func_sig : func), ses) =
           fprintf f "@[<h 2>%s:@ %a@]" func_sig.name SES.pp_print ses
         in
-        eprintf "@[<v 2>Propagating side-effects from:@ @[<v 2>[%a]@]@]@."
+        eprintf
+          "propagate_recursive_calls_sess END: @[<v 2>Propagating side-effects \
+           from:@ @[<v 2>[%a]@]@]@."
           (pp_print_list ~pp_sep pp) res
     in
     res
