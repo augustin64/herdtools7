@@ -2398,13 +2398,12 @@ module Make  (C:Config) (AI:Arch_herd.S) (Act:Action.S with module A = AI) :
              | `No ->
                [EventRel.cartesian (get_output rm) input_wm; ] end in
            (* Handle the case where wm is NoAction *)
-           let wm_rels = empty_list_if_variant (Variant.T 95) begin
-            match EventSet.elements wm.events with
+           let wm_rels = match EventSet.elements wm.events with
              | [evt] when Act.is_no_action evt.action ->
                []
              | evts when List.for_all is_mem_store evts  ->
                wm_data @ wm_addr
-             | _ -> assert false end in
+             | _ -> assert false in
            let rels =
              (wrs_data @ wm_rels) @
              [empty_evtrel_if_variant (Variant.T 96) (EventRel.cartesian output_rn input_rm);
