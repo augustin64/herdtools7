@@ -2215,15 +2215,12 @@ module Make(Cfg:Config) : XXXCompile_gen.S =
       EOR W1, W0, W0
       then, it depends on CasSrc *)
       match cas_src with
-      | CasSrcM -> Warn.fatal "CasSrcM not implemented (see CasSrcRn as a fallback)"
+      | CasSrcM -> Warn.fatal "CasSrcM not implemented"
       | CasSrcRn ->
         (* Here, we add ADD x x 0 (with dep to src register) *)
         (r1, r2, x),ins_list@[do_add64 vdep x x depend_reg;],st,init
-      | _ ->
-        match cas_src with
-        | CasSrcRs -> (depend_reg, r1, x),ins_list,st,init
-        | CasSrcRt -> (r1, depend_reg, x),ins_list,st,init
-        | _ -> failwith "not possible"
+      | CasSrcRs -> (depend_reg, r1, x),ins_list,st,init
+      | CasSrcRt -> (r1, depend_reg, x),ins_list,st,init
 
 
     (* Compute 0 to a register with a dependency (EOR, AND or other) *)

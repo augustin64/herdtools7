@@ -517,7 +517,7 @@ let is_ifetch a = match a with
    | Instr,_ -> Code.Instr
    | (Tag|CapaTag|CapaSeal|Pte _|Neon _),Some _ -> assert false
    | (Plain _|Acq _|AcqPc _|Rel _|Atomic _|ACas),_
-     -> Code.Ord (* TODO Allows R/W, but is Code.Ord what we mean ? *)
+     -> Code.Ord (* TODO Allows R/W, but is Code.Ord what we mean for ACas ? *)
 
 
 (**************)
