@@ -2404,8 +2404,9 @@ module Make  (C:Config) (AI:Arch_herd.S) (Act:Action.S with module A = AI) :
              | evts when List.for_all is_mem_store evts  ->
                wm_data @ wm_addr
              | _ -> assert false in
+          let rtrs_rel = if C.variant (Variant.T 88) then [EventRel.cartesian (get_output rt) input_wrs] else [] in
            let rels =
-             (wrs_data @ wm_rels) @
+             (wrs_data @ wm_rels) @ rtrs_rel @
              [empty_evtrel_if_variant (Variant.T 96) (EventRel.cartesian output_rn input_rm);
               empty_evtrel_if_variant (Variant.T 97) (EventRel.cartesian (get_output rs) input_br);
               empty_evtrel_if_variant (Variant.T 98)(EventRel.cartesian (get_output rm) input_br);] in
