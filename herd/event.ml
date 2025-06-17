@@ -2405,8 +2405,14 @@ module Make  (C:Config) (AI:Arch_herd.S) (Act:Action.S with module A = AI) :
                wm_data @ wm_addr
              | _ -> assert false in
           let rtrs_rel = if C.variant (Variant.T 88) then [EventRel.cartesian (get_output rt) input_wrs] else [] in
+          let rnrs_rel = if C.variant (Variant.T 87) then [EventRel.cartesian (get_output rn) input_wrs] else [] in
+          let rsrs_rel = if C.variant (Variant.T 86) then [EventRel.cartesian (get_output rs) input_wrs] else [] in
+          let mm_rel =  if C.variant (Variant.T 85) then [EventRel.cartesian (get_output rm) input_wm] else [] in
+          let mrs_rel = if C.variant (Variant.T 84) then [EventRel.cartesian (get_output rm) input_wrs] else [] in
+          let rsm_rel = if C.variant (Variant.T 83) then [EventRel.cartesian (get_output rs) input_wm] else [] in
+          let variant_rels = rtrs_rel @ rnrs_rel @ rsrs_rel @ mm_rel @ mrs_rel @ rsm_rel in
            let rels =
-             (wrs_data @ wm_rels) @ rtrs_rel @
+             (wrs_data @ wm_rels) @ variant_rels @
              [empty_evtrel_if_variant (Variant.T 96) (EventRel.cartesian output_rn input_rm);
               empty_evtrel_if_variant (Variant.T 97) (EventRel.cartesian (get_output rs) input_br);
               empty_evtrel_if_variant (Variant.T 98)(EventRel.cartesian (get_output rm) input_br);] in
