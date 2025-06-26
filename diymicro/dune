@@ -2,8 +2,8 @@
  (copy ../Version.ml Version.ml))
 
 (executables
- (names diymicro diymicroenum)
- (public_names diymicro7 diymicroenum7)
+ (names diymicro diymicroenum diymicrofuzz)
+ (public_names diymicro7 diymicroenum7 diymicrofuzz7)
  (libraries herdtools unix))
 
 (ocamllex lexer)
